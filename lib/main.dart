@@ -40,35 +40,28 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-  Future<void> requestNotificationPermission(BuildContext context) async {
-final permission = await OneSignal.Notifications.getPermission();
+Future<void> requestNotificationPermission(BuildContext context) async {
 
-  if (permission == false) {
+  bool permission = await OneSignal.Notifications.requestPermission(true);
+
+  if (!permission) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Bildirim İzni"),
         content: const Text(
-          "Görev ve Kanıt Bildirimleri İçin Ayarlardan Bildirimleri Açmanız Gerek",
+          "Görev ve Kanıt Bildirimleri için bildirim izni vermeniz gerekir.",
         ),
         actions: [
           TextButton(
-            child: const Text("İptal"),
+            child: const Text("Kapat"),
             onPressed: () => Navigator.pop(context),
           ),
-         TextButton(
-  child: const Text("Ayarlara Git"),
-  onPressed: () {
-    OneSignal.Notifications.openSettings();
-    Navigator.pop(context);
-  },
-),
         ],
       ),
     );
-  } else { 
-    OneSignal.Notifications.requestPermission(true);
   }
+
 }
  
 void _saveOneSignalIdAndNotify(String id) async {
@@ -153,39 +146,53 @@ class _WebViewPageState extends State<WebViewPage> {
   bool _isLoading = true;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = _createController();
+void initState() {
+  super.initState();
+  _controller = _createController();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-    requestNotificationPermission(context);
+  Future.delayed(const Duration(seconds: 2), () {
+    if (mounted) {
+      requestNotificationPermission(context);
+    }
   });
-  
+
+  // App açıkken bildirime basma
   OneSignal.Notifications.addClickListener((event) {
-  final data = event.notification.additionalData;
+    final data = event.notification.additionalData;
 
-  if (data != null && data["url"] != null) {
-    final url = data["url"];
-    _controller.loadRequest(Uri.parse(url));
-  }
-});
+    if (data != null && data["url"] != null) {
+      final url = data["url"];
+      _controller.loadRequest(Uri.parse(url));
+    }
+  });
 
-    _controller
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) => setState(() => _isLoading = true),
-          onPageFinished: (String url) {
-            setState(() => _isLoading = false);
-            _tryParseUserIdFromUrl(url);
-          },
-          onWebResourceError: (error) {
-            debugPrint('WebView hatası: ${error.description}');
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(_initialUrl));
-  }
+  // Cold Start Push
+  Future.delayed(const Duration(seconds: 1), () async {
+    final notification = await OneSignal.Notifications.getLaunchNotification();
+
+    if (notification != null) {
+      final data = notification.notification.additionalData;
+
+      if (data != null && data["url"] != null) {
+        final url = data["url"]; 
+        _controller.loadRequest(Uri.parse(url));
+      }
+    }
+  });
+
+  _controller
+    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+    ..setNavigationDelegate(
+      NavigationDelegate(
+        onPageStarted: (_) => setState(() => _isLoading = true),
+        onPageFinished: (String url) {
+          setState(() => _isLoading = false);
+          _tryParseUserIdFromUrl(url);
+        },
+      ),
+    )
+    ..loadRequest(Uri.parse(_initialUrl));
+}
 
   /// Laravel login/register sonrası yönlendirmede gelen ?user_id= ile user_id'yi alır; storage'a yazar, popup gösterir, API sync dener
   void _tryParseUserIdFromUrl(String url) async {
