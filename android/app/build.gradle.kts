@@ -6,6 +6,7 @@ plugins {
     id("kotlin-android")
     
     id("dev.flutter.flutter-gradle-plugin")
+	id("com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -14,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-android {
+android { 
     namespace = "com.kumpara.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
