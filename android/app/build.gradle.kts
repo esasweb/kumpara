@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android { 
-    namespace = "net.kumpara.app"
+    namespace = "net.Kumpara.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "net.kumpara.app"
+        applicationId = "net.Kumpara.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
