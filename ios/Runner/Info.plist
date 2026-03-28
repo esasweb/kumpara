@@ -44,6 +44,44 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+	<true/> 
+	<key>NSAppTransportSecurity</key>
+<dict>
+   <key>NSAllowsArbitraryLoads</key>
+   <true/>
+</dict>
+
+<key>NSUserNotificationUsageDescription</key>
+<string>Bildirim almak için izin gereklidir.</string>
+
+<key>NSCameraUsageDescription</key>
+<string>Fotoğraf yüklemek için kamera izni gerekir.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Fotoğraf seçmek için galeri izni gerekir.</string>
+
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>Fotoğraf kaydetmek için galeri izni gerekir.</string>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key>
+    <string>kumpara</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>kumpara</string>
+    </array>
+  </dict>
+</array>
+
+<key>com.apple.developer.associated-domains</key>
+<array>
+<string>applinks:kumpara.com.tr</string>
+<string>applinks:www.kumpara.com.tr</string>
+</array>
+<key>GADApplicationIdentifier</key>
+<string>ca-app-pub-6275851890605245~8883436807</string>
+<key>NSUserTrackingUsageDescription</key>
+<string>Size daha alakalı reklamlar gösterebilmek için izin istiyoruz.</string>
 </dict>
 </plist>
