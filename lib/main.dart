@@ -13,12 +13,10 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:new_version_plus/new_version_plus.dart';
-
-
+import 'package:upgrader/upgrader.dart';
 
 
 
@@ -125,15 +123,27 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kumpara',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const WebViewPage(),
-    );
+   return MaterialApp(
+  title: 'Kumpara',
+  debugShowCheckedModeBanner: false,
+  theme: ThemeData(
+    colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+    useMaterial3: true,
+  ),
+
+ builder: (context, child) { 
+  return UpgradeAlert(
+    upgrader: Upgrader(
+      debugDisplayAlways: false,
+      countryCode: 'TR',
+      languageCode: 'tr',
+    ),
+    child: child!,
+  );
+},
+
+  home: const WebViewPage(),
+);
   }
 }
 
@@ -148,7 +158,7 @@ class _WebViewPageState extends State<WebViewPage> {
   static const String _initialUrl = 'https://www.kumpara.com.tr/mobil/';
   late final WebViewController _controller;
   bool _isLoading = true;
-StreamSubscription? _sub;
+StreamSubscription<Uri>? _sub;
 InterstitialAd? _interstitialAd;
 RewardedAd? _rewardedAd;
 
@@ -172,37 +182,7 @@ String get adUnitId {
   }
 }
 
-Future<void> _checkAppUpdate() async {
 
-  final newVersion = NewVersionPlus(
-    androidId: "net.Kumpara.app", 
-    iOSId: "com.kumpara.app",
-  );
-
-  final status = await newVersion.getVersionStatus();
-
-  if (status != null) {
-
-    if (status.canUpdate) {
-
-      newVersion.showUpdateDialog(
-        context: context,
-        versionStatus: status,
-        dialogTitle: "Yeni Güncelleme",
-        dialogText:
-            "Uygulamanın yeni bir sürümü mevcut. Güncellemek ister misiniz?",
-        updateButtonText: "Güncelle",
-        dismissButtonText: "Daha Sonra",
-        dismissAction: () {
-          Navigator.pop(context);
-        },
-      );
-
-    }
-
-  }
-
-}
 
 void _showUpdateDialog(bool forceUpdate, String url) {
 
@@ -372,21 +352,23 @@ void _maybeShowAd() async {
   _loadAd();
 }
 
+late final AppLinks _appLinks;
+
 Future<void> _initDeepLinks() async {
 
-  // App kapalıyken gelen link
-  final initialUri = await getInitialUri();
+  _appLinks = AppLinks();
 
-  if (initialUri != null) {
-    _controller.loadRequest(initialUri);
+  final uri = await _appLinks.getInitialLink();
+
+  if (uri != null) {
+    _controller.loadRequest(uri);
   }
 
-  // App açıkken gelen link
-  _sub = uriLinkStream.listen((Uri? uri) {
-    if (uri != null) {
-      _controller.loadRequest(uri);
-    }
-  });
+  _sub = _appLinks.uriLinkStream.listen((uri) {
+  if (mounted) {
+    _controller.loadRequest(uri);
+  }
+});
 }
 
   @override
@@ -396,7 +378,6 @@ _loadAdSettings().then((_) {
 });
 _loadRewardedAd();
   super.initState();
-  _checkAppUpdate();
   _controller = _createController();
   
 if (_controller.platform is AndroidWebViewController) {
