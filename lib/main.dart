@@ -15,7 +15,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:uni_links/uni_links.dart';
 import 'dart:async';
-
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:new_version_plus/new_version_plus.dart';
 
 
 
@@ -171,6 +172,72 @@ String get adUnitId {
   }
 }
 
+Future<void> _checkAppUpdate() async {
+
+  final newVersion = NewVersionPlus(
+    androidId: "net.Kumpara.app", 
+    iOSId: "com.kumpara.app",
+  );
+
+  final status = await newVersion.getVersionStatus();
+
+  if (status != null) {
+
+    if (status.canUpdate) {
+
+      newVersion.showUpdateDialog(
+        context: context,
+        versionStatus: status,
+        dialogTitle: "Yeni Güncelleme",
+        dialogText:
+            "Uygulamanın yeni bir sürümü mevcut. Güncellemek ister misiniz?",
+        updateButtonText: "Güncelle",
+        dismissButtonText: "Daha Sonra",
+        dismissAction: () {
+          Navigator.pop(context);
+        },
+      );
+
+    }
+
+  }
+
+}
+
+void _showUpdateDialog(bool forceUpdate, String url) {
+
+  showDialog(
+    context: context,
+    barrierDismissible: !forceUpdate,
+    builder: (_) => AlertDialog(
+      title: const Text("Uygulama Güncellemesi"),
+      content: const Text(
+        "Uygulamanın yeni bir sürümü mevcut. Güncellemek için mağazaya gidin.",
+      ),
+      actions: [
+
+        if (!forceUpdate)
+          TextButton(
+            child: const Text("Daha Sonra"),
+            onPressed: () => Navigator.pop(context),
+          ),
+
+        TextButton(
+          child: const Text("Güncelle"),
+          onPressed: () async {
+
+            final uri = Uri.parse(url);
+
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+
+          },
+        ),
+      ],
+    ),
+  );
+}
 Future<void> _loadAdSettings() async {
   try {
     final res = await http.get(
@@ -329,6 +396,7 @@ _loadAdSettings().then((_) {
 });
 _loadRewardedAd();
   super.initState();
+  _checkAppUpdate();
   _controller = _createController();
   
 if (_controller.platform is AndroidWebViewController) {
