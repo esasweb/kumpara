@@ -17,7 +17,8 @@ import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
-
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 
 
@@ -29,6 +30,9 @@ const String _kSyncDoneKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
 await MobileAds.instance.initialize();
   OneSignal.initialize('c19bfcc0-96e5-43ae-b482-f38b2be22b76');
 
@@ -131,16 +135,7 @@ class MyApp extends StatelessWidget {
     useMaterial3: true,
   ),
 
- builder: (context, child) { 
-  return UpgradeAlert(
-    upgrader: Upgrader(
-      debugDisplayAlways: false,
-      countryCode: 'TR',
-      languageCode: 'tr',
-    ),
-    child: child!,
-  );
-},
+
 
   home: const WebViewPage(),
 );
@@ -258,9 +253,14 @@ void _loadAd() {
         );
 
       },
-      onAdFailedToLoad: (error) {
-        _interstitialAd = null;
-      },
+     onAdFailedToLoad: (error) {
+  _interstitialAd = null;
+
+  Future.delayed(
+    const Duration(seconds: 10),
+    _loadAd,
+  );
+}
     ),
   );
 }
@@ -275,9 +275,14 @@ void _loadRewardedAd() {
       onAdLoaded: (ad) {
         _rewardedAd = ad;
       },
-      onAdFailedToLoad: (error) {
-        _rewardedAd = null;
-      },
+     onAdFailedToLoad: (error) {
+  _rewardedAd = null;
+
+  Future.delayed(
+    const Duration(seconds: 15),
+    _loadRewardedAd,
+  );
+},
     ),
   );
 }
@@ -360,24 +365,27 @@ Future<void> _initDeepLinks() async {
 
   final uri = await _appLinks.getInitialLink();
 
-  if (uri != null) {
-    _controller.loadRequest(uri);
-  }
+  Future.delayed(const Duration(milliseconds: 300), () {
+    if (uri != null) {
+      _controller.loadRequest(uri);
+    }
+  });
 
   _sub = _appLinks.uriLinkStream.listen((uri) {
-  if (mounted) {
-    _controller.loadRequest(uri);
-  }
-});
+    if (mounted) {
+      _controller.loadRequest(uri);
+    }
+  });
 }
 
   @override
 void initState() {
+  super.initState();
 _loadAdSettings().then((_) {
   _loadAd();
 });
 _loadRewardedAd();
-  super.initState();
+
   _controller = _createController();
   
 if (_controller.platform is AndroidWebViewController) {
@@ -427,7 +435,7 @@ onNavigationRequest: (NavigationRequest request) async {
   }
 
   if (await canLaunchUrl(uri)) {  
-    await launchUrl(uri);
+   await launchUrl(uri, mode: LaunchMode.externalApplication);
     return NavigationDecision.prevent;
   }
 
@@ -440,8 +448,30 @@ onNavigationRequest: (NavigationRequest request) async {
   setState(() => _isLoading = false);
 
  _pageCount++;
-_tryParseUserIdFromUrl(url);
+_tryParseUserIdFromUrl(url); 
 _maybeShowAd();
+
+// --- YATAY KAYDIRMAYI ENGELLEME VE GİZLEME KODU ---
+  _controller.runJavaScript('''
+    var style = document.createElement('style');
+    style.type = 'text/css';
+    style.innerHTML = `
+      html, body {
+        overflow-x: hidden !important; /* Yatay kaydırmayı tamamen kapat */
+        width: 100% !important;
+        position: relative !important;
+      }
+      ::-webkit-scrollbar {
+        display: none !important; /* Kaydırma çubuklarını tamamen gizle (isteğe bağlı) */
+      }
+    `;
+    document.getElementsByTagName('head')[0].appendChild(style);
+  ''');
+  // ------------------------------------------------
+  
+},
+onWebResourceError: (error) {
+  debugPrint("WebView error: ${error.description}");
 },
 ),
     )
@@ -459,7 +489,8 @@ _maybeShowAd();
       
 
       final prefs = await SharedPreferences.getInstance();
-	    OneSignal.login(uid);
+	   OneSignal.login(uid);
+OneSignal.User.addTagWithKey("user_id", uid);
       await prefs.setString(_kUserIdStorageKey, uid);
       await _syncOneSignalIdToBackendIfReady();
     } catch (_) {
@@ -479,47 +510,82 @@ void dispose() {
 
 
 
-  WebViewController _createController() {
-    final platformParams = const PlatformWebViewControllerCreationParams();
+WebViewController _createController() {
+  final platformParams = const PlatformWebViewControllerCreationParams();
 
-   if (Platform.isAndroid) {
-  final androidParams =
-      AndroidWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
-        platformParams,
-      );
+  if (Platform.isAndroid) {
+    final androidParams =
+        AndroidWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
+          platformParams,
+        );
 
-  final controller =
-      WebViewController.fromPlatformCreationParams(androidParams);
+    final controller =
+        WebViewController.fromPlatformCreationParams(androidParams);
 
-  AndroidWebViewController.enableDebugging(true);
+    controller.setUserAgent("KumparaApp-Android/1.0");
 
-  return controller;
-}
-
-    if (Platform.isIOS) {
-      final wkParams =
-          WebKitWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
-            platformParams,
-            allowsInlineMediaPlayback: true,
-            mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
-          );
-      return WebViewController.fromPlatformCreationParams(wkParams);
+    if (!kReleaseMode) {
+      AndroidWebViewController.enableDebugging(true);
     }
 
-    return WebViewController.fromPlatformCreationParams(platformParams);
+    return controller;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_isLoading) const Center(child: CircularProgressIndicator()),
-          ],
+  if (Platform.isIOS) {
+    final wkParams =
+        WebKitWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
+          platformParams,
+          allowsInlineMediaPlayback: true,
+          mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+        );
+
+    final controller =
+        WebViewController.fromPlatformCreationParams(wkParams);
+
+    controller.setUserAgent("KumparaApp-iOS/1.0");
+
+    return controller;
+  }
+
+  return WebViewController.fromPlatformCreationParams(platformParams);
+}
+
+@override
+Widget build(BuildContext context) {
+  return UpgradeAlert(
+    upgrader: Upgrader(
+      debugDisplayAlways: false,
+      countryCode: 'TR',
+      languageCode: 'tr',
+      durationUntilAlertAgain: const Duration(days: 1),
+    ),
+    // --- BURASI EKLENDİ ---
+    child: PopScope(
+      canPop: false, // Sistemin varsayılan "geri" işlemini (uygulamayı kapatma) engelle
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return; // Eğer pop işlemi zaten gerçekleşmişse bir şey yapma
+
+        // WebView içinde geri gidilebilecek bir sayfa var mı?
+        if (await _controller.canGoBack()) {
+          await _controller.goBack(); // WebView'da geri git
+        } else {
+          // Eğer WebView'da geri gidecek sayfa yoksa uygulamayı kapat
+          SystemNavigator.pop(); 
+        }
+      },
+      // ----------------------
+      child: Scaffold(
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _controller),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator()),
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
