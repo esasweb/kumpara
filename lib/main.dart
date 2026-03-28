@@ -28,10 +28,8 @@ const String _kSyncDoneKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // OneSignal 5.4.1: initialize senkron (void döner)
   OneSignal.initialize('c19bfcc0-96e5-43ae-b482-f38b2be22b76');
 
-  // Panelde gördüğünüz cihaz ID'si = OneSignal User ID (Subscription ID değil)
   OneSignal.User.addObserver((OSUserChangedState state) {
     final id = state.current.onesignalId;
     if (id != null && id.isNotEmpty) {
@@ -39,9 +37,38 @@ Future<void> main() async {
     }
   });
 
-  OneSignal.Notifications.requestPermission(true);
-
   runApp(const MyApp());
+}
+
+  Future<void> requestNotificationPermission(BuildContext context) async {
+final permission = await OneSignal.Notifications.getPermission();
+
+  if (permission == false) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Bildirim İzni"),
+        content: const Text(
+          "Görev ve Kanıt Bildirimleri İçin Ayarlardan Bildirimleri Açmanız Gerek",
+        ),
+        actions: [
+          TextButton(
+            child: const Text("İptal"),
+            onPressed: () => Navigator.pop(context),
+          ),
+         TextButton(
+  child: const Text("Ayarlara Git"),
+  onPressed: () {
+    OneSignal.Notifications.openSettings();
+    Navigator.pop(context);
+  },
+),
+        ],
+      ),
+    );
+  } else { 
+    OneSignal.Notifications.requestPermission(true);
+  }
 }
  
 void _saveOneSignalIdAndNotify(String id) async {
@@ -130,7 +157,18 @@ class _WebViewPageState extends State<WebViewPage> {
     super.initState();
     _controller = _createController();
 
-    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+    requestNotificationPermission(context);
+  });
+  
+  OneSignal.Notifications.addClickListener((event) {
+  final data = event.notification.additionalData;
+
+  if (data != null && data["url"] != null) {
+    final url = data["url"];
+    _controller.loadRequest(Uri.parse(url));
+  }
+});
 
     _controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
