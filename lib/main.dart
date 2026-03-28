@@ -46,29 +46,67 @@ await MobileAds.instance.initialize();
   runApp(const MyApp());
 }
 
-Future<void> requestNotificationPermission(BuildContext context) async {
 
+
+Future<void> requestNotificationPermission(BuildContext context) async {
+  final prefs = await SharedPreferences.getInstance();
+  final String lastPromptKey = 'last_notification_prompt_date';
+  
+  // 1. Mevcut izni kontrol et ve iste
   bool permission = await OneSignal.Notifications.requestPermission(true);
 
-  if (!permission) {
+  // Eğer izin zaten verilmişse fonksiyondan çık
+  if (permission) return;
+
+  // 2. Bugün zaten sorduk mu kontrol et?
+  final String? lastPromptDate = prefs.getString(lastPromptKey);
+  final String today = DateTime.now().toIso8601String().split('T')[0]; // Örn: 2026-03-28
+
+  if (lastPromptDate == today) {
+    debugPrint("Bildirim izni bugün zaten soruldu, tekrar sorulmuyor.");
+    return; 
+  }
+
+  // 3. İzin yoksa ve bugün henüz sorulmadıysa uyarını göster
+  if (context.mounted) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: const Text("Bildirim İzni"),
+        title: const Text("Bildirimler Kapalı"),
         content: const Text(
-          "Görev ve Kanıt Bildirimleri için bildirim izni vermeniz gerekir.",
+          "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir.",
         ),
         actions: [
           TextButton(
             child: const Text("Kapat"),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // Bugün sorduğumuzu kaydedelim ki bir daha sormasın
+              prefs.setString(lastPromptKey, today);
+              Navigator.pop(context);
+            }, 
+          ),
+          ElevatedButton(
+            child: const Text("Ayarlara Git"),
+            onPressed: () {
+              Navigator.pop(context);
+              // Kullanıcıyı uygulama ayarlarına yönlendirir
+              // OneSignal bu metodla sistem ayarlarını tetiklemeye çalışır
+              OneSignal.Notifications.requestPermission(true);
+              
+              /* NOT: Eğer bu buton ayarları açmazsa, pubspec.yaml dosyanıza 
+                 'app_settings' paketini ekleyip AppSettings.openAppSettings(); 
+                 komutunu buraya yazabilirsiniz. 
+              */
+            },
           ),
         ],
       ),
     );
   }
-
 }
+
+
  
 void _saveOneSignalIdAndNotify(String id) async {
   final prefs = await SharedPreferences.getInstance();
@@ -398,11 +436,7 @@ if (_controller.platform is AndroidWebViewController) {
 
 
 
-  Future.delayed(const Duration(seconds: 2), () {
-    if (mounted) {
-      requestNotificationPermission(context);
-    }
-  });
+  
 
   // App açıkken bildirime basma
   OneSignal.Notifications.addClickListener((event) {
@@ -427,24 +461,43 @@ if (_controller.platform is AndroidWebViewController) {
     ..setNavigationDelegate(
     NavigationDelegate(
 onNavigationRequest: (NavigationRequest request) async {
-
   final uri = Uri.parse(request.url);
+  final String url = request.url;
 
-  if (uri.scheme == 'http' || uri.scheme == 'https') {
+  // 1. Kendi siten mi kontrol et? (Domain kontrolü)
+  // Sitenin hem www'li hem www'siz halini kontrol ediyoruz.
+  bool isInternalHost = url.startsWith('https://www.kumpara.com.tr') || 
+                        url.startsWith('https://kumpara.com.tr');
+
+  if (isInternalHost) {
+    // Kendi sitense uygulamanın içinde devam et
     return NavigationDecision.navigate;
+  } 
+
+  // 2. Eğer link dış bir bağlantıysa (Google, Instagram, reklam linki vb.)
+  // veya özel bir şema ise (whatsapp:// , tel:// , mailto://)
+  try {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Uygulama içinde açılmasını engelle
+      return NavigationDecision.prevent;
+    }
+  } catch (e) {
+    debugPrint("Link açılırken hata oluştu: $e");
   }
 
-  if (await canLaunchUrl(uri)) {  
-   await launchUrl(uri, mode: LaunchMode.externalApplication);
-    return NavigationDecision.prevent;
-  }
-
-  return NavigationDecision.navigate;
+  // Varsayılan olarak (başka bir durum kalmadıysa) engellemek daha güvenlidir
+  return NavigationDecision.prevent; 
 },
 
   onPageStarted: (_) => setState(() => _isLoading = true),
 
   onPageFinished: (String url) {
+  
+  // BURAYI EKLE
+  if (url.contains('/dashboard')) {
+    requestNotificationPermission(context);
+  }
   setState(() => _isLoading = false);
 
  _pageCount++;

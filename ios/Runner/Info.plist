@@ -3,8 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
+	<string>tr</string> <key>CFBundleDisplayName</key>
 	<string>Kumpara</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -45,43 +44,51 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/> 
+	
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>tr</string>
+	</array>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
+
 	<key>NSAppTransportSecurity</key>
-<dict>
-   <key>NSAllowsArbitraryLoads</key>
-   <true/>
-</dict>
+	<dict>
+	   <key>NSAllowsArbitraryLoads</key>
+	   <true/>
+	</dict>
 
-<key>NSUserNotificationUsageDescription</key>
-<string>Bildirim almak için izin gereklidir.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Görev bildirimlerini alabilmeniz için izin gereklidir.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Görev kanıtı fotoğrafı çekebilmeniz için kamera izni gerekir.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galerinizden kanıt yükleyebilmeniz için galeri izni gerekir.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Fotoğraf kaydetmek için galeri yazma izni gerekir.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Size daha alakalı reklamlar gösterebilmek için izin istiyoruz.</string>
 
-<key>NSCameraUsageDescription</key>
-<string>Fotoğraf yüklemek için kamera izni gerekir.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+	  <dict>
+		<key>CFBundleURLName</key>
+		<string>kumpara</string>
+		<key>CFBundleURLSchemes</key>
+		<array>
+		  <string>kumpara</string>
+		</array>
+	  </dict>
+	</array>
 
-<key>NSPhotoLibraryUsageDescription</key>
-<string>Fotoğraf seçmek için galeri izni gerekir.</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:kumpara.com.tr</string>
+		<string>applinks:www.kumpara.com.tr</string>
+	</array>
 
-<key>NSPhotoLibraryAddUsageDescription</key>
-<string>Fotoğraf kaydetmek için galeri izni gerekir.</string>
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleURLName</key>
-    <string>kumpara</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>kumpara</string>
-    </array>
-  </dict>
-</array>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-6275851890605245~8883436807</string>
 
-<key>com.apple.developer.associated-domains</key>
-<array>
-<string>applinks:kumpara.com.tr</string>
-<string>applinks:www.kumpara.com.tr</string>
-</array>
-<key>GADApplicationIdentifier</key>
-<string>ca-app-pub-6275851890605245~8883436807</string>
-<key>NSUserTrackingUsageDescription</key>
-<string>Size daha alakalı reklamlar gösterebilmek için izin istiyoruz.</string>
 </dict>
 </plist>

@@ -18,7 +18,7 @@
             android:value="ca-app-pub-6275851890605245~4398281364"/>
 
         <activity
-            android:name=".MainActivity"
+            android:name=".MainActivity" 
             android:exported="true"
             android:launchMode="singleTop" 
             android:taskAffinity=""
