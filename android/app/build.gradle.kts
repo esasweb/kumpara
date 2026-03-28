@@ -16,21 +16,21 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android { 
-    namespace = "com.kumpara.app"
+    namespace = "net.kumpara.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
+    } 
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
-        applicationId = "net.Kumpara.app"
+        applicationId = "net.kumpara.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
