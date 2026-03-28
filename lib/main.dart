@@ -166,19 +166,7 @@ void initState() {
     }
   });
 
-  // Cold Start Push
-  Future.delayed(const Duration(seconds: 1), () async {
-    final notification = await OneSignal.Notifications.getLaunchNotification();
 
-    if (notification != null) {
-      final data = notification.notification.additionalData;
-
-      if (data != null && data["url"] != null) {
-        final url = data["url"]; 
-        _controller.loadRequest(Uri.parse(url));
-      }
-    }
-  });
 
   _controller
     ..setJavaScriptMode(JavaScriptMode.unrestricted)
