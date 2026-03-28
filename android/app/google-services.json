@@ -16,6 +16,25 @@
       "api_key": [
         {
           "current_key": "AIzaSyCjbJ8o5uxWWgK3SihkARymTk90yET143M"
+        } 
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1080717363640:android:befd49960a4638ab44274d",
+        "android_client_info": {
+          "package_name": "net.kumpara.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjbJ8o5uxWWgK3SihkARymTk90yET143M"
         }
       ],
       "services": {

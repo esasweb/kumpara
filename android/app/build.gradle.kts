@@ -9,14 +9,14 @@ plugins {
 	id("com.google.gms.google-services")
 }
 
-val keystoreProperties = Properties()
+val keystoreProperties = Properties() 
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android { 
-    namespace = "net.Kumpara.app"
+    namespace = "net.kumpara.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "net.Kumpara.app"
+        applicationId = "net.kumpara.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
