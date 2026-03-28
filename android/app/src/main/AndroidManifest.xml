@@ -1,81 +1,57 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- INTERNET -->
     <uses-permission android:name="android.permission.INTERNET"/>
-
-    <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
-    <!-- Boot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-
-    <!-- Camera -->
     <uses-permission android:name="android.permission.CAMERA"/>
- 
-    <!-- Storage (Android 12 ve altı) --> 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-
-    <!-- Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 
     <application
         android:label="Kumpara"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
-		android:value="ca-app-pub-6275851890605245~4398281364">
+        android:usesCleartextTraffic="true"> 
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6275851890605245~4398281364"/>
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTop" 
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Flutter Normal Theme -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"/>
 
-            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-			
-	<intent-filter android:autoVerify="true">
-
-    <action android:name="android.intent.action.VIEW"/>
-
-    <category android:name="android.intent.category.DEFAULT"/>
-    <category android:name="android.intent.category.BROWSABLE"/>
-
-    <data
-        android:scheme="https"
-        android:host="www.kumpara.com.tr"
-        android:pathPrefix="/" />
-
-    <data
-        android:scheme="https"
-        android:host="kumpara.com.tr"
-        android:pathPrefix="/" />
-
-</intent-filter>
+            
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="www.kumpara.com.tr" android:pathPrefix="/" />
+                <data android:scheme="https" android:host="kumpara.com.tr" android:pathPrefix="/" />
+            </intent-filter>
 
         </activity>
 
-        <!-- Flutter Embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
 
     </application>
 
-    <!-- Text Processing -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
@@ -84,4 +60,3 @@
     </queries>
 
 </manifest>
-
