@@ -12,25 +12,13 @@ import 'package:webview_flutter_platform_interface/webview_flutter_platform_inte
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
-/// Bildirim izni verildiğinde alınan OneSignal ID buraya yazılır; UI modal gösterir.
-final ValueNotifier<String?> onesignalIdToShowModal = ValueNotifier<String?>(
-  null,
-);
 
-/// Laravel'den giriş yapıldığında gelen user_id; UI popup gösterir.
-final ValueNotifier<String?> loggedInUserIdToShowModal = ValueNotifier<String?>(
-  null,
-);
 
-/// OneSignal ID API sync sonucu; ekranda alert gösterilir (başarılı / başarısız).
-final ValueNotifier<SyncResult?> syncResultToShowModal =
-    ValueNotifier<SyncResult?>(null);
 
-class SyncResult {
-  final bool success;
-  final String message;
-  SyncResult({required this.success, required this.message});
-}
+
+
+
+
 
 const String _kOneSignalIdStorageKey = 'onesignal_id';
 const String _kUserIdStorageKey = 'user_id';
@@ -55,15 +43,11 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
-
+ 
 void _saveOneSignalIdAndNotify(String id) async {
   final prefs = await SharedPreferences.getInstance();
-  final hadStoredId = prefs.getString(_kOneSignalIdStorageKey) != null;
   await prefs.setString(_kOneSignalIdStorageKey, id);
 
-  if (!hadStoredId) {
-    onesignalIdToShowModal.value = id;
-  }
   await _syncOneSignalIdToBackendIfReady();
 }
 
@@ -100,24 +84,14 @@ Future<void> _syncOneSignalIdToBackendIfReady() async {
 
     if (res.statusCode == 200) {
       await prefs.setString(_kSyncDoneKey, '$userId-$onesignalId');
-      syncResultToShowModal.value = SyncResult(
-        success: true,
-        message: 'İstek gönderildi, kaydedildi.',
-      );
+     
       debugPrint('OneSignal ID backend ile eşlendi: user_id=$userId');
     } else {
-      syncResultToShowModal.value = SyncResult(
-        success: false,
-        message:
-            'Gönderilemedi. (${res.statusCode}) ${res.body.isNotEmpty ? res.body : "Sunucu hatası"}',
-      );
+   
       debugPrint('OneSignal sync API hatası: ${res.statusCode} ${res.body}');
     }
   } catch (e) {
-    syncResultToShowModal.value = SyncResult(
-      success: false,
-      message: 'Gönderilemedi. Hata: $e',
-    );
+   
     debugPrint('OneSignal sync istisna: $e');
   }
 }
@@ -156,9 +130,7 @@ class _WebViewPageState extends State<WebViewPage> {
     super.initState();
     _controller = _createController();
 
-    onesignalIdToShowModal.addListener(_onOneSignalIdToShow);
-    loggedInUserIdToShowModal.addListener(_onLoggedInUserIdToShow);
-    syncResultToShowModal.addListener(_onSyncResultToShow);
+    
 
     _controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -184,7 +156,7 @@ class _WebViewPageState extends State<WebViewPage> {
       final uid = uri.queryParameters['user_id'];
       if (uid == null || uid.isEmpty) return;
 
-      loggedInUserIdToShowModal.value = uid;
+      
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kUserIdStorageKey, uid);
@@ -196,95 +168,14 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   void dispose() {
-    onesignalIdToShowModal.removeListener(_onOneSignalIdToShow);
-    loggedInUserIdToShowModal.removeListener(_onLoggedInUserIdToShow);
-    syncResultToShowModal.removeListener(_onSyncResultToShow);
+   
     super.dispose();
   }
 
-  void _onSyncResultToShow() {
-    final result = syncResultToShowModal.value;
-    if (result == null || !mounted) return;
-    syncResultToShowModal.value = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => AlertDialog(
-          title: Text(
-            result.success
-                ? 'OneSignal ID kaydedildi'
-                : 'OneSignal ID gönderilemedi',
-          ),
-          content: SelectableText(result.message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
 
-  void _onLoggedInUserIdToShow() {
-    final userId = loggedInUserIdToShowModal.value;
-    if (userId == null || !mounted) return;
-    loggedInUserIdToShowModal.value = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => AlertDialog(
-          title: const Text('Giriş başarılı'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('User ID\'niz:'),
-              const SizedBox(height: 8),
-              SelectableText(
-                userId,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
 
-  void _onOneSignalIdToShow() {
-    final id = onesignalIdToShowModal.value;
-    if (id == null || !mounted) return;
-    onesignalIdToShowModal.value = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => AlertDialog(
-          title: const Text('OneSignal ID alındı'),
-          content: SelectableText(id),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
+
+
 
   WebViewController _createController() {
     final platformParams = const PlatformWebViewControllerCreationParams();
