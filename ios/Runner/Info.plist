@@ -3,7 +3,8 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>tr</string> <key>CFBundleDisplayName</key>
+	<string>tr</string>
+	<key>CFBundleDisplayName</key>
 	<string>Kumpara</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -40,10 +41,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<key>CADisableMinimumFrameDurationOnPhone</key> 
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/> 
+	<true/>
 	
 	<key>CFBundleLocalizations</key>
 	<array>
@@ -54,8 +55,8 @@
 
 	<key>NSAppTransportSecurity</key>
 	<dict>
-	   <key>NSAllowsArbitraryLoads</key>
-	   <true/>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
 	</dict>
 
 	<key>NSUserNotificationUsageDescription</key>
@@ -71,20 +72,14 @@
 
 	<key>CFBundleURLTypes</key>
 	<array>
-	  <dict>
-		<key>CFBundleURLName</key>
-		<string>kumpara</string>
-		<key>CFBundleURLSchemes</key>
-		<array>
-		  <string>kumpara</string>
-		</array>
-	  </dict>
-	</array>
-
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:kumpara.com.tr</string>
-		<string>applinks:www.kumpara.com.tr</string>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>kumpara</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kumpara</string>
+			</array>
+		</dict>
 	</array>
 
 	<key>GADApplicationIdentifier</key>

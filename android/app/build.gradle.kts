@@ -9,7 +9,7 @@ plugins {
 	id("com.google.gms.google-services")
 }
 
-val keystoreProperties = Properties() 
+val keystoreProperties = Properties()  
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))

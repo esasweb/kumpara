@@ -19,6 +19,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:file_picker/file_picker.dart';
 
 
 
@@ -51,61 +53,56 @@ await MobileAds.instance.initialize();
 Future<void> requestNotificationPermission(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   final String lastPromptKey = 'last_notification_prompt_date';
-  
-  // 1. Mevcut izni kontrol et ve iste
-  bool permission = await OneSignal.Notifications.requestPermission(true);
+  final String today = DateTime.now().toIso8601String().split('T')[0];
 
-  // Eğer izin zaten verilmişse fonksiyondan çık
-  if (permission) return;
-
-  // 2. Bugün zaten sorduk mu kontrol et?
+  // 1. ADIM: Bugün zaten sorduk mu? (En başa aldık)
   final String? lastPromptDate = prefs.getString(lastPromptKey);
-  final String today = DateTime.now().toIso8601String().split('T')[0]; // Örn: 2026-03-28
-
   if (lastPromptDate == today) {
-    debugPrint("Bildirim izni bugün zaten soruldu, tekrar sorulmuyor.");
+    debugPrint("Bildirim izni bugün zaten soruldu.");
     return; 
   }
 
-  // 3. İzin yoksa ve bugün henüz sorulmadıysa uyarını göster
-  if (context.mounted) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text("Bildirimler Kapalı"),
-        content: const Text(
-          "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir.",
+  // 2. ADIM: Mevcut izin durumunu kontrol et (Sormadan önce)
+  bool hasPermission = OneSignal.Notifications.permission;
+  if (hasPermission) return; // Zaten izin var, bir şey yapma.
+
+  // 3. ADIM: Bugün sormadıysak ve izin yoksa, SİSTEM penceresini aç
+  // Not: Kullanıcı daha önce "Asla" dediyse bu pencere açılmaz, direkt false döner.
+  bool result = await OneSignal.Notifications.requestPermission(true);
+
+  // 4. ADIM: Eğer sistem penceresinde reddettiyse veya daha önce reddetmişse
+  if (!result) {
+    if (context.mounted) {
+      // Bugün sorduğumuzu kaydedelim (Diyaloğu göstersek de göstermesek de)
+      await prefs.setString(lastPromptKey, today);
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: const Text("Bildirimler Kapalı"),
+          content: const Text(
+            "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir. Lütfen ayarlardan bildirimleri açın.",
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Kapat"),
+              onPressed: () => Navigator.pop(context),
+            ),
+            ElevatedButton(
+              child: const Text("Ayarlara Git"),
+              onPressed: () {
+                Navigator.pop(context);
+                // Ayarları açmak için en garanti yöntem:
+                OneSignal.Notifications.requestPermission(true);
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            child: const Text("Kapat"),
-            onPressed: () {
-              // Bugün sorduğumuzu kaydedelim ki bir daha sormasın
-              prefs.setString(lastPromptKey, today);
-              Navigator.pop(context);
-            }, 
-          ),
-          ElevatedButton(
-            child: const Text("Ayarlara Git"),
-            onPressed: () {
-              Navigator.pop(context);
-              // Kullanıcıyı uygulama ayarlarına yönlendirir
-              // OneSignal bu metodla sistem ayarlarını tetiklemeye çalışır
-              OneSignal.Notifications.requestPermission(true);
-              
-              /* NOT: Eğer bu buton ayarları açmazsa, pubspec.yaml dosyanıza 
-                 'app_settings' paketini ekleyip AppSettings.openAppSettings(); 
-                 komutunu buraya yazabilirsiniz. 
-              */
-            },
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 }
-
 
  
 void _saveOneSignalIdAndNotify(String id) async {
@@ -163,20 +160,27 @@ Future<void> _syncOneSignalIdToBackendIfReady() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  @override
+  @override // Sadece bir tane override olmalı
   Widget build(BuildContext context) {
-   return MaterialApp(
-  title: 'Kumpara',
-  debugShowCheckedModeBanner: false,
-  theme: ThemeData(
-    colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-    useMaterial3: true,
-  ),
-
-
-
-  home: const WebViewPage(),
-);
+    return MaterialApp(
+      title: 'Kumpara',
+      debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('tr', 'TR'), 
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('tr', 'TR'), 
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const WebViewPage(),
+    );
   }
 }
 
@@ -410,7 +414,7 @@ Future<void> _initDeepLinks() async {
   });
 
   _sub = _appLinks.uriLinkStream.listen((uri) {
-    if (mounted) {
+    if (mounted) { 
       _controller.loadRequest(uri);
     }
   });
@@ -431,6 +435,25 @@ if (_controller.platform is AndroidWebViewController) {
       _controller.platform as AndroidWebViewController; 
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
+  
+  
+  // --- BURASI DOSYA SEÇMEYİ SAĞLAYAN KRİTİK KISIM ---
+  androidController.setOnShowFileSelector((params) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any, // Sadece resim istersen FileType.image yapabilirsin
+      allowMultiple: params.mode == FileSelectorMode.openMultiple,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      // Seçilen dosyaların yollarını WebView'a geri gönderiyoruz
+      return result.files
+          .where((file) => file.path != null)
+          .map((file) => Uri.file(file.path!).toString())
+          .toList();
+    }
+    return []; // Kullanıcı iptal ederse boş liste dön
+  });
+  // ------------------------------------------------
 }
 
 
@@ -529,6 +552,8 @@ onWebResourceError: (error) {
 ),
     )
     ..loadRequest(Uri.parse(_initialUrl));
+	
+	
 	_initDeepLinks();
 }
 
