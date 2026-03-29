@@ -31,11 +31,23 @@ const String _kSyncDoneKey =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Bu kısmı güncelle/ekle
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent, // Üst bar şeffaf
+    systemNavigationBarColor: Colors.transparent, // Alt bar şeffaf
+    statusBarIconBrightness: Brightness.light, // Simgeler beyaz
+  ));
+  
+  // Ekranın en altına kadar yayılmayı zorla
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  await MobileAds.instance.initialize();
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
   };
-await MobileAds.instance.initialize();
+
   OneSignal.initialize('c19bfcc0-96e5-43ae-b482-f38b2be22b76');
 
   OneSignal.User.addObserver((OSUserChangedState state) {
@@ -191,7 +203,7 @@ class WebViewPage extends StatefulWidget {
   State<WebViewPage> createState() => _WebViewPageState();
 }
 
-class _WebViewPageState extends State<WebViewPage> {
+class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver{
   static const String _initialUrl = 'https://www.kumpara.com.tr/mobil/';
   late final WebViewController _controller;
   bool _isLoading = true;
@@ -206,6 +218,8 @@ bool _adsEnabled = false;
 int _interstitialEvery = 10;
 int _maxAdsPerSession = 3;
 int _minSecondsBetweenAds = 90;
+bool _appOpenEnabled = false;
+int _appOpenCooldown = 30;
 
 DateTime _lastAdTime = DateTime.now();
 
@@ -219,7 +233,72 @@ String get adUnitId {
   }
 }
 
+// --- APP OPEN REKLAM DEĞİŞKENLERİ ---
+AppOpenAd? _appOpenAd;
+bool _isAppOpenAdLoading = false;
+DateTime? _lastAppOpenAdShownTime;
 
+String get appOpenAdUnitId {
+  if (Platform.isAndroid) {
+    return 'ca-app-pub-6275851890605245/4049081947'; // Görseldeki Android ID
+  } else if (Platform.isIOS) {
+    return 'ca-app-pub-6275851890605245/8084529874'; // Görseldeki iOS ID
+  }
+  return '';
+}
+
+// Reklamı yükle (Pre-load)
+void _loadAppOpenAd() {
+  if (_isAppOpenAdLoading) return;
+  _isAppOpenAdLoading = true;
+
+  AppOpenAd.load(
+    adUnitId: appOpenAdUnitId,
+    request: const AdRequest(),
+    adLoadCallback: AppOpenAdLoadCallback(
+      onAdLoaded: (ad) {
+        _appOpenAd = ad;
+        _isAppOpenAdLoading = false;
+      },
+      onAdFailedToLoad: (error) {
+        _isAppOpenAdLoading = false;
+        _appOpenAd = null;
+      },
+    ),
+  );
+}
+
+// Reklamı göster (Ayarlara göre)
+void _showAppOpenAdIfReady() {
+  if (!_appOpenEnabled) return; // Sunucudan gelen kilit kapalıysa çık
+  if (_appOpenAd == null) {
+    _loadAppOpenAd();
+    return;
+  }
+
+  // Cooldown (Soğuma) Kontrolü
+  if (_lastAppOpenAdShownTime != null) {
+    final diff = DateTime.now().difference(_lastAppOpenAdShownTime!).inMinutes;
+    if (diff < _appOpenCooldown) {
+      debugPrint("Açılış reklamı için soğuma süresi dolmadı: $diff/$_appOpenCooldown dk");
+      return;
+    }
+  }
+
+  _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
+    onAdDismissedFullScreenContent: (ad) {
+      _appOpenAd = null;
+      _loadAppOpenAd(); // Kapanınca yenisini yükle
+    },
+    onAdFailedToShowFullScreenContent: (ad, error) {
+      _appOpenAd = null;
+      _loadAppOpenAd();
+    },
+  );
+
+  _appOpenAd!.show();
+  _lastAppOpenAdShownTime = DateTime.now();
+}
 
 void _showUpdateDialog(bool forceUpdate, String url) {
 
@@ -255,20 +334,29 @@ void _showUpdateDialog(bool forceUpdate, String url) {
     ),
   );
 }
-Future<void> _loadAdSettings() async {
+Future<void> _loadAdSettings() async { 
   try {
     final res = await http.get(
       Uri.parse('${AppApi.baseUrl}/api/mobile/ad-settings'),
     );
+	
 
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
+  final data = jsonDecode(res.body);
+  setState(() { // <--- BU ÇOK ÖNEMLİ
+    _adsEnabled = data["ads_enabled"] ?? false;
+    _interstitialEvery = data["interstitial_every"] ?? 10;
+    _maxAdsPerSession = data["max_ads_per_session"] ?? 3;
+    _minSecondsBetweenAds = data["min_seconds_between_ads"] ?? 90;
+    _appOpenEnabled = data["app_open_enabled"] ?? false;
+    _appOpenCooldown = data["app_open_cooldown_minutes"] ?? 30;
+  });
 
-      _adsEnabled = data["ads_enabled"] ?? false;
-      _interstitialEvery = data["interstitial_every"] ?? 10;
-      _maxAdsPerSession = data["max_ads_per_session"] ?? 3;
-      _minSecondsBetweenAds = data["min_seconds_between_ads"] ?? 90;
-    }
+  if (_appOpenEnabled) {
+    _loadAppOpenAd();
+  }
+}
+
   } catch (e) {
     debugPrint("Ad settings error: $e");
   }
@@ -423,9 +511,11 @@ Future<void> _initDeepLinks() async {
   @override
 void initState() {
   super.initState();
+  WidgetsBinding.instance.addObserver(this);
 _loadAdSettings().then((_) {
-  _loadAd();
-});
+    _loadAd();
+    _loadAppOpenAd(); // Ayarlar gelince reklamı önceden yükle
+  });
 _loadRewardedAd();
 
   _controller = _createController();
@@ -516,6 +606,18 @@ onNavigationRequest: (NavigationRequest request) async {
   onPageStarted: (_) => setState(() => _isLoading = true),
 
   onPageFinished: (String url) {
+  // Mevcut JS kodlarının içine veya altına ekle:
+  _controller.runJavaScript('''
+    // Sayfanın en üstüne ve en altına telefonun boşluğu kadar padding ekler
+    document.body.style.paddingTop = 'env(safe-area-inset-top)';
+    document.body.style.paddingBottom = 'env(safe-area-inset-bottom)';
+    
+    // Eğer sitende sabit (fixed) bir header varsa onun için de şunu ekleyebilirsin:
+    var header = document.querySelector('header'); 
+    if(header) {
+      header.style.paddingTop = 'env(safe-area-inset-top)';
+    }
+  ''');
   
   // BURAYI EKLE
   if (url.contains('/dashboard')) {
@@ -557,6 +659,13 @@ onWebResourceError: (error) {
 	_initDeepLinks();
 }
 
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  // Uygulama tekrar ön plana (ekrana) geldiğinde
+  if (state == AppLifecycleState.resumed) {
+    _showAppOpenAdIfReady();
+  }
+}
   /// Laravel login/register sonrası yönlendirmede gelen ?user_id= ile user_id'yi alır; storage'a yazar, popup gösterir, API sync dener
   void _tryParseUserIdFromUrl(String url) async {
     try {
@@ -578,9 +687,11 @@ OneSignal.User.addTagWithKey("user_id", uid);
 
 @override
 void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
   _sub?.cancel();
   _interstitialAd?.dispose();
   _rewardedAd?.dispose();
+  _appOpenAd?.dispose(); // BU SATIRI EKLE
   super.dispose();
 }
  
@@ -627,7 +738,7 @@ WebViewController _createController() {
 
   return WebViewController.fromPlatformCreationParams(platformParams);
 }
-
+ 
 @override
 Widget build(BuildContext context) {
   return UpgradeAlert(
@@ -653,15 +764,15 @@ Widget build(BuildContext context) {
       },
       // ----------------------
       child: Scaffold(
-        body: SafeArea(
-          child: Stack(
+        
+          body: Stack(
             children: [
               WebViewWidget(controller: _controller),
               if (_isLoading)
                 const Center(child: CircularProgressIndicator()),
             ],
           ),
-        ),
+        
       ),
     ),
   );
