@@ -578,33 +578,28 @@ if (_controller.platform is AndroidWebViewController) {
     ..setNavigationDelegate(
     NavigationDelegate(
 onNavigationRequest: (NavigationRequest request) async {
-  final uri = Uri.parse(request.url);
   final String url = request.url;
 
-  // 1. Kendi siten mi kontrol et? (Domain kontrolü)
-  // Sitenin hem www'li hem www'siz halini kontrol ediyoruz.
-  bool isInternalHost = url.startsWith('https://www.kumpara.com.tr') || 
-                        url.startsWith('https://kumpara.com.tr');
-
-  if (isInternalHost) {
-    // Kendi sitense uygulamanın içinde devam et
+  // 1. Eğer link kumpara.com.tr içeriyorsa ASLA tarayıcıyı açma, uygulamanın içinde kal
+  if (url.contains('kumpara.com.tr')) {
     return NavigationDecision.navigate;
   } 
 
-  // 2. Eğer link dış bir bağlantıysa (Google, Instagram, reklam linki vb.)
-  // veya özel bir şema ise (whatsapp:// , tel:// , mailto://)
-  try {
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      // Uygulama içinde açılmasını engelle
-      return NavigationDecision.prevent;
+  // 2. Özel şemaları (WhatsApp, Tel vb.) dışarıda aç
+  if (url.startsWith('whatsapp:') || url.startsWith('tel:') || url.startsWith('mailto:')) {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
-  } catch (e) {
-    debugPrint("Link açılırken hata oluştu: $e");
+    return NavigationDecision.prevent;
   }
 
-  // Varsayılan olarak (başka bir durum kalmadıysa) engellemek daha güvenlidir
-  return NavigationDecision.prevent; 
+  // 3. Gerçekten yabancı bir siteyse (Google, reklam vb.) dışarıda aç
+  if (await canLaunchUrl(Uri.parse(url))) {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    return NavigationDecision.prevent;
+  }
+
+  return NavigationDecision.prevent;  
 },
 
   onPageStarted: (_) => setState(() => _isLoading = true),
@@ -660,7 +655,7 @@ onWebResourceError: (error) {
     ..loadRequest(Uri.parse(_initialUrl));
 	
 	
-	_initDeepLinks();
+	
 }
 
 @override
