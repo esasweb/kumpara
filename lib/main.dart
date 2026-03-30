@@ -513,6 +513,7 @@ Future<void> _initDeepLinks() async {
   @override
 void initState() {
   super.initState();
+
   WidgetsBinding.instance.addObserver(this);
 _loadAdSettings().then((_) {
     _loadAd();
@@ -521,6 +522,7 @@ _loadAdSettings().then((_) {
 _loadRewardedAd();
 
   _controller = _createController();
+     _initDeepLinks(); // 🔴 BU YOK
   
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
