@@ -741,17 +741,15 @@ WebViewController _createController() {
   return WebViewController.fromPlatformCreationParams(platformParams);
 }
  
-@override
+@override 
 Widget build(BuildContext context) {
   return UpgradeAlert(
-    upgrader: Upgrader(
-      appStoreId: '6760625142', // Resimden aldığımız ID
-      debugDisplayAlways: false, // Test aşamasında her zaman gösterilmesi için true kalsın
-      durationUntilAlertAgain: Duration.zero, // Bekleme süresini sıfırladık
-      countryCode: 'TR',
-      languageCode: 'tr',
-      messages: UpgraderMessages(code: 'tr'), // Mesajların Türkçe olduğundan emin olalım
-    ),
+  upgrader: Upgrader(
+  debugDisplayAlways: false, // Burayı test bitince false yapabilirsin
+  durationUntilAlertAgain: Duration.zero, // Her açılışta kontrol etsin
+  countryCode: 'TR',
+  languageCode: 'tr', // Bu satır zaten her şeyi Türkçe yapar
+),
     child: PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
