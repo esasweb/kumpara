@@ -10,4 +10,13 @@ import UIKit
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+
+  // --- BU KISMI EKLE ---
+  override func application(
+    _ application: UIApplication, 
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    return super.application(application, continue: userActivity, restorationHandler: restorationHandler)
+  }
 }

@@ -21,6 +21,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:app_settings/app_settings.dart';
 
 
 
@@ -92,22 +93,23 @@ Future<void> requestNotificationPermission(BuildContext context) async {
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
-          title: const Text("Bildirimler Kapalı"),
+          title: const Text("Bildirimler Kapalı!"),
           content: const Text(
             "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir. Lütfen ayarlardan bildirimleri açın.",
           ),
-          actions: [
+          actions: [  
             TextButton(
               child: const Text("Kapat"),
               onPressed: () => Navigator.pop(context),
             ),
             ElevatedButton(
-              child: const Text("Ayarlara Git"),
-              onPressed: () {
-                Navigator.pop(context);
-                // Ayarları açmak için en garanti yöntem:
-                OneSignal.Notifications.requestPermission(true);
-              },
+            child: const Text("Ayarlara Git"),
+  onPressed: () {
+    Navigator.pop(context);
+    // Bu komut, kullanıcıyı hiiiç soru sormadan direkt 
+    // telefonun Ayarlar > Kumpara sayfasına ışınlar.
+    AppSettings.openAppSettings(type: AppSettingsType.notification);
+  },
             ),
           ],
         ),
@@ -743,36 +745,31 @@ WebViewController _createController() {
 Widget build(BuildContext context) {
   return UpgradeAlert(
     upgrader: Upgrader(
-      debugDisplayAlways: false,
+      appStoreId: '6760625142', // Resimden aldığımız ID
+      debugDisplayAlways: false, // Test aşamasında her zaman gösterilmesi için true kalsın
+      durationUntilAlertAgain: Duration.zero, // Bekleme süresini sıfırladık
       countryCode: 'TR',
       languageCode: 'tr',
-      durationUntilAlertAgain: const Duration(days: 1),
+      messages: UpgraderMessages(code: 'tr'), // Mesajların Türkçe olduğundan emin olalım
     ),
-    // --- BURASI EKLENDİ ---
     child: PopScope(
-      canPop: false, // Sistemin varsayılan "geri" işlemini (uygulamayı kapatma) engelle
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return; // Eğer pop işlemi zaten gerçekleşmişse bir şey yapma
-
-        // WebView içinde geri gidilebilecek bir sayfa var mı?
+        if (didPop) return;
         if (await _controller.canGoBack()) {
-          await _controller.goBack(); // WebView'da geri git
+          await _controller.goBack();
         } else {
-          // Eğer WebView'da geri gidecek sayfa yoksa uygulamayı kapat
-          SystemNavigator.pop(); 
+          SystemNavigator.pop();
         }
       },
-      // ----------------------
       child: Scaffold(
-        
-          body: Stack(
-            children: [
-              WebViewWidget(controller: _controller),
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator()),
-            ],
-          ),
-        
+        body: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator()),
+          ],
+        ),
       ),
     ),
   );

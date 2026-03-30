@@ -85,5 +85,9 @@
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-6275851890605245~8883436807</string>
 
+<key>UIBackgroundModes</key>
+<array>
+    <string>remote-notification</string>
+</array> 
 </dict>
 </plist>
