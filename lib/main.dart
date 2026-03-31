@@ -492,19 +492,21 @@ void _maybeShowAd() async {
 late final AppLinks _appLinks;
 
 Future<void> _initDeepLinks() async {
-
   _appLinks = AppLinks();
 
+  // İlk açılış linkini yakala
   final uri = await _appLinks.getInitialLink();
+  if (uri != null) {
+    // WebView'ın tamamen hazır olduğundan emin olmak için kısa bir bekleme
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       _controller.loadRequest(uri);
+    });
+  }
 
-  Future.delayed(const Duration(milliseconds: 300), () {
-    if (uri != null) {
-      _controller.loadRequest(uri);
-    }
-  });
-
+  // Uygulama arkadayken gelen linkleri dinle
   _sub = _appLinks.uriLinkStream.listen((uri) {
-    if (mounted) { 
+    if (mounted) {
+      debugPrint("🔗 Gelen Deep Link: $uri");
       _controller.loadRequest(uri);
     }
   });
@@ -582,39 +584,44 @@ if (_controller.platform is AndroidWebViewController) {
     ..setNavigationDelegate(
     NavigationDelegate(
 onNavigationRequest: (NavigationRequest request) async {
-
-// Eğer navigasyon ana çerçevede değilse (örneğin bir reklam iframe'i ise) karışma
   if (!request.isMainFrame) {
     return NavigationDecision.navigate;
   }
   
   final String rawUrl = request.url;
-  final String url = rawUrl.toLowerCase(); // Küçük harf yaparak kontrolü garantiye alalım
+  final String url = rawUrl.toLowerCase();
 
-  // 🔴 KRİTİK KURAL 1: Eğer link bizim sitemizse ASLA dışarı atma, hemen içeri al ve fonksiyonu bitir.
-  if (url.contains('kumpara.com.tr')) {
-    debugPrint("✅ İÇERİDE TUTULUYOR: $rawUrl");
+  // DEBUG: Hangi URL'nin tarayıcıya fırlatıldığını görmek için burayı izleyin
+  debugPrint("🔍 Kontrol edilen URL: $rawUrl");
+
+  // 1. Kural: Kendi siteniz veya alt alan adlarınız ise kesinlikle içeride tut.
+  // 'kumpara' kelimesini içeren her şeyi içeride tutmak daha güvenlidir.
+  if (url.contains('kumpara.com.tr') || url.contains('kumpara.com')) {
     return NavigationDecision.navigate;
   }
 
-  // 🔴 KRİTİK KURAL 2: OneSignal takip linkleri ise içeride kalsın (Yoksa Safari'ye seker)
-  if (url.contains('onesignal.com')) {
+  // 2. Kural: OneSignal veya Firebase gibi servisleri içeride tut.
+  if (url.contains('onesignal.com') || url.contains('google.com')) { 
     return NavigationDecision.navigate;
   }
 
-  // 3. Özel Şemalar (WhatsApp, Telefon, Mail) - Bunları dışarıda aç
+  // 3. Kural: HTTP/HTTPS dışındaki şemaları (WhatsApp, Tel vb.) dışarı at ama 'externalNonBrowserApplication' kullan.
   if (!url.startsWith('http')) {
     final Uri uri = Uri.parse(rawUrl);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
     }
     return NavigationDecision.prevent;
   }
 
-  // 4. DIŞ BAĞLANTI KORUMASI: 
-  // Buraya geldiysek link 'http' ile başlıyor ama içinde 'kumpara.com.tr' GEÇMİYOR demektir.
-  // Sadece bu durumda Safari'ye gönderiyoruz.
-  debugPrint("🚀 GERÇEK DIŞ BAĞLANTI (Safari'ye gidiyor): $rawUrl");
+  // 4. Kural: Eğer link uygulama içinden tetiklenen bir 'intent' ise bunu engelleme.
+  // Bazen 'intent://' gibi yapılar tarayıcıya fırlatılmasına sebep olur.
+  if (url.startsWith('intent://')) {
+    return NavigationDecision.prevent; 
+  }
+
+  // 5. Kural: Gerçekten yabancı bir site ise (Google, Facebook vb.) tarayıcıda aç.
+  debugPrint("🚀 DIŞ BAĞLANTIYA GİDİYOR: $rawUrl");
   await launchUrl(Uri.parse(rawUrl), mode: LaunchMode.externalApplication);
   return NavigationDecision.prevent;
 },
