@@ -554,7 +554,6 @@ if (_controller.platform is AndroidWebViewController) {
       _controller.platform as AndroidWebViewController; 
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
-    androidController.setSupportMultipleWindows(false);
   
   
   // --- BURASI DOSYA SEÇMEYİ SAĞLAYAN KRİTİK KISIM ---
