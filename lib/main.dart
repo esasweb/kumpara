@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:in_app_review/in_app_review.dart';
 
 
 
@@ -489,6 +490,28 @@ void _maybeShowAd() async {
   _loadAd();
 }
 
+
+// _WebViewPageState sınıfının içinde bir yere ekle:
+final InAppReview _inAppReview = InAppReview.instance;
+
+Future<void> _maybeShowReviewDialog() async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // Daha önce sorduysak bir daha sorma
+  bool alreadyReviewed = prefs.getBool('already_reviewed') ?? false;
+  if (alreadyReviewed) return;
+
+  // 25 sayfa gezildiyse tetikle
+  if (_pageCount >= 35) {
+    if (await _inAppReview.isAvailable()) {
+      await _inAppReview.requestReview();
+      // Başarıyla tetiklendiyse kaydet ki her 25 sayfada bir çıkmasın
+      await prefs.setBool('already_reviewed', true);
+    }
+  }
+}
+
+
 late final AppLinks _appLinks;
 
 Future<void> _initDeepLinks() async {
@@ -531,6 +554,7 @@ if (_controller.platform is AndroidWebViewController) {
       _controller.platform as AndroidWebViewController; 
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
+    androidController.setSupportMultipleWindows(false);
   
   
   // --- BURASI DOSYA SEÇMEYİ SAĞLAYAN KRİTİK KISIM ---
@@ -584,46 +608,59 @@ if (_controller.platform is AndroidWebViewController) {
     ..setNavigationDelegate(
     NavigationDelegate(
 onNavigationRequest: (NavigationRequest request) async {
-  if (!request.isMainFrame) {
-    return NavigationDecision.navigate;
-  }
-  
-  final String rawUrl = request.url;
-  final String url = rawUrl.toLowerCase();
+  final String url = request.url;
+  final String lowUrl = url.toLowerCase();
 
-  // DEBUG: Hangi URL'nin tarayıcıya fırlatıldığını görmek için burayı izleyin
-  debugPrint("🔍 Kontrol edilen URL: $rawUrl");
+  debugPrint("🔍 Kontrol edilen URL: $url");
 
-  // 1. Kural: Kendi siteniz veya alt alan adlarınız ise kesinlikle içeride tut.
-  // 'kumpara' kelimesini içeren her şeyi içeride tutmak daha güvenlidir.
-  if (url.contains('kumpara.com.tr') || url.contains('kumpara.com')) {
-    return NavigationDecision.navigate;
-  }
-
-  // 2. Kural: OneSignal veya Firebase gibi servisleri içeride tut.
-  if (url.contains('onesignal.com') || url.contains('google.com')) { 
-    return NavigationDecision.navigate;
-  }
-
-  // 3. Kural: HTTP/HTTPS dışındaki şemaları (WhatsApp, Tel vb.) dışarı at ama 'externalNonBrowserApplication' kullan.
-  if (!url.startsWith('http')) {
-    final Uri uri = Uri.parse(rawUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+  // HTTP olmayanlar
+  if (!lowUrl.startsWith('http')) {
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+      }
+    } catch (e) {
+      debugPrint("Şema açma hatası: $e");
     }
     return NavigationDecision.prevent;
   }
 
-  // 4. Kural: Eğer link uygulama içinden tetiklenen bir 'intent' ise bunu engelleme.
-  // Bazen 'intent://' gibi yapılar tarayıcıya fırlatılmasına sebep olur.
-  if (url.startsWith('intent://')) {
-    return NavigationDecision.prevent; 
+  Uri uri;
+  try {
+    uri = Uri.parse(url);
+  } catch (_) {
+    return NavigationDecision.prevent;
   }
 
-  // 5. Kural: Gerçekten yabancı bir site ise (Google, Facebook vb.) tarayıcıda aç.
-  debugPrint("🚀 DIŞ BAĞLANTIYA GİDİYOR: $rawUrl");
-  await launchUrl(Uri.parse(rawUrl), mode: LaunchMode.externalApplication);
-  return NavigationDecision.prevent;
+  // kendi siten
+  if (uri.host.endsWith('kumpara.com.tr')) {
+    return NavigationDecision.navigate;
+  }
+
+  // login servisleri
+  if (lowUrl.contains('accounts.google.com') ||
+      lowUrl.contains('googleusercontent.com') ||
+      lowUrl.contains('gstatic.com') ||
+      lowUrl.contains('appleid.apple.com')) {
+    return NavigationDecision.navigate;
+  }
+
+  // dış siteler
+  if (request.isMainFrame) {
+    debugPrint("🚀 DIŞ TARAYICIYA GÖNDERİLİYOR: $url");
+
+   if (await canLaunchUrl(uri)) {
+  await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication, 
+  );
+}
+
+    return NavigationDecision.prevent;
+  }
+
+  return NavigationDecision.navigate;
 },
 
   onPageStarted: (_) => setState(() => _isLoading = true),
@@ -651,6 +688,8 @@ onNavigationRequest: (NavigationRequest request) async {
  _pageCount++;
 _tryParseUserIdFromUrl(url); 
 _maybeShowAd();
+// BURAYA EKLE:
+  _maybeShowReviewDialog();
 
 // --- YATAY KAYDIRMAYI ENGELLEME VE GİZLEME KODU ---
   _controller.runJavaScript('''
