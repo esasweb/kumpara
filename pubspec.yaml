@@ -2,7 +2,7 @@ name: flutter_app
 description: 'Kumpara Mobil Uygulaması'
 publish_to: 'none'
 
-version: 1.0.13+18
+version: 1.0.14+19
 
 environment:
   sdk: ^3.10.1

@@ -237,7 +237,7 @@ double _adY = 0;
 double _adW = 0;
 double _adH = 0;
 bool _isDivPresent = false; // Sitede o div var mı?
-
+ 
 // Reklam yükleme fonksiyonu (ID'lerin içine gömülü)
 void _loadBannerAd(int width, int height) {
   _bannerAd?.dispose();
