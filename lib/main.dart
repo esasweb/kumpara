@@ -303,14 +303,14 @@ void _setupBannerPositionChannel() {
         
         // Eğer div varsa ve reklam yüklü değilse yükle
         if (_isDivPresent && !_isBannerAdLoaded) {
-          _loadBannerAd();
+          _loadBannerAd(data['w'].toInt(), data['h'].toInt());
           _showBannerAd = true;
         }
       });
-    },
+    }, 
   );
 }
-
+ 
 String get _storeUrl {
   if (Platform.isAndroid) {
     // Buraya kendi Google Play linkini yapıştır
