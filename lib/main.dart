@@ -240,27 +240,26 @@ bool _isDivPresent = false; // Sitede o div var mı?
 
 // Reklam yükleme fonksiyonu (ID'lerin içine gömülü)
 void _loadBannerAd(int width, int height) {
-  // Eski reklamı temizle
   _bannerAd?.dispose();
   _isBannerAdLoaded = false;
 
   AdSize selectedSize;
 
-  // 4 Standart Ölçü Tanımlaması
-  if (width == 320 && height == 50) {
-    selectedSize = AdSize.banner; // Standart Banner
-  } else if (width == 320 && height == 100) {
-    selectedSize = AdSize.largeBanner; // Büyük Banner
-  } else if (width == 300 && height == 250) {
-    selectedSize = AdSize.mediumRectangle; // Orta Dikdörtgen (En karlı olan)
-  } else if (width == 336 && height == 280) {
-    selectedSize = AdSize(width: 336, height: 280); // Büyük Dikdörtgen
+  // Ölçüleri 5 piksellik yanılma payıyla kontrol et
+  if ((width - 320).abs() < 5 && (height - 50).abs() < 5) {
+    selectedSize = AdSize.banner;
+  } else if ((width - 320).abs() < 5 && (height - 100).abs() < 5) {
+    selectedSize = AdSize.largeBanner;
+  } else if ((width - 300).abs() < 5 && (height - 250).abs() < 5) {
+    selectedSize = AdSize.mediumRectangle; // Senin HTML'deki ölçün
+  } else if ((width - 336).abs() < 5 && (height - 280).abs() < 5) {
+    selectedSize = AdSize(width: 336, height: 280);
   } else {
-    debugPrint("HATA: Standart dışı ölçü ($width x $height). Reklam yüklenmedi.");
-    return; // Eğer bu 4 ölçüden biri değilse reklam yükleme
+    // Eğer hiçbirine uymuyorsa, HTML'den gelen ölçüyü zorla kullanmayı dene (Riskli ama reklamı gösterir)
+    selectedSize = AdSize(width: width, height: height);
   }
 
-  _bannerAd = BannerAd(
+  _bannerAd = BannerAd( 
     adUnitId: Platform.isAndroid 
         ? 'ca-app-pub-6275851890605245/6372884572' 
         : 'ca-app-pub-6275851890605245/9377275683',
@@ -269,8 +268,8 @@ void _loadBannerAd(int width, int height) {
     listener: BannerAdListener(
       onAdLoaded: (ad) => setState(() => _isBannerAdLoaded = true),
       onAdFailedToLoad: (ad, error) {
+        debugPrint("Reklam yükleme hatası: ${error.message}");
         ad.dispose();
-        _isBannerAdLoaded = false;
       },
     ),
   )..load();
@@ -805,28 +804,37 @@ onNavigationRequest: (NavigationRequest request) async {
 
   onPageFinished: (String url) {
   
-  _controller.runJavaScript('''
+ _controller.runJavaScript('''
+    var lastX, lastY, lastW, lastH;
+    
     function trackBannerDiv() {
       const el = document.getElementById('bannerreklam');
       if (el) {
         const rect = el.getBoundingClientRect();
-        // Koordinatları Flutter'a gönder
-        window.BannerPosition.postMessage(JSON.stringify({
-          present: true,
-          x: rect.left,
-          y: rect.top,
-          w: rect.width,
-          h: rect.height
-        }));
+        
+        // Sadece koordinatlar değiştiyse mesaj gönder (Performans için KRİTİK)
+        if (lastX !== rect.left || lastY !== rect.top || lastW !== rect.width || lastH !== rect.height) {
+          lastX = rect.left;
+          lastY = rect.top;
+          lastW = rect.width;
+          lastH = rect.height;
+          
+          window.BannerPosition.postMessage(JSON.stringify({
+            present: true,
+            x: rect.left,
+            y: rect.top,
+            w: Math.round(rect.width), // Tam sayıya yuvarla
+            h: Math.round(rect.height) // Tam sayıya yuvarla
+          }));
+        }
       } else {
         window.BannerPosition.postMessage(JSON.stringify({ present: false, x:0, y:0, w:0, h:0 }));
       }
     }
 
-    // Hem kaydırırken hem de düzenli aralıklarla kontrol et
+    // 32ms yerine 200ms yap (Gözle fark edilmez ama işlemciyi kurtarır)
+    setInterval(trackBannerDiv, 200); 
     window.addEventListener('scroll', trackBannerDiv);
-    window.addEventListener('resize', trackBannerDiv);
-    setInterval(trackBannerDiv, 32); // 150ms'de bir tazele (pil dostu)
   ''');
   
   
