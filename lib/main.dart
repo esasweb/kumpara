@@ -34,15 +34,17 @@ const String _kSyncDoneKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Bu kısmı güncelle/ekle
+ // Status bar simgelerini BEYAZ yapar
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent, // Üst bar şeffaf
-    systemNavigationBarColor: Colors.transparent, // Alt bar şeffaf
-    statusBarIconBrightness: Brightness.light, // Simgeler beyaz
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light, // Android için beyaz
+    statusBarBrightness: Brightness.dark,      // iOS için beyaz
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
   ));
   
   // Ekranın en altına kadar yayılmayı zorla
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); 
 
   await MobileAds.instance.initialize();
 
@@ -224,6 +226,56 @@ int _minSecondsBetweenAds = 90;
 bool _appOpenEnabled = false;
 int _appOpenCooldown = 30;
 
+// _WebViewPageState sınıfının içindeki değişkenleri şu şekilde güncelle:
+BannerAd? _bannerAd;
+bool _isBannerAdLoaded = false;
+bool _showBannerAd = false; 
+
+// Koordinat değişkenleri
+double _adX = 0;
+double _adY = 0;
+double _adW = 0;
+double _adH = 0;
+bool _isDivPresent = false; // Sitede o div var mı?
+
+// Reklam yükleme fonksiyonu (ID'lerin içine gömülü)
+void _loadBannerAd(int width, int height) {
+  // Eski reklamı temizle
+  _bannerAd?.dispose();
+  _isBannerAdLoaded = false;
+
+  AdSize selectedSize;
+
+  // 4 Standart Ölçü Tanımlaması
+  if (width == 320 && height == 50) {
+    selectedSize = AdSize.banner; // Standart Banner
+  } else if (width == 320 && height == 100) {
+    selectedSize = AdSize.largeBanner; // Büyük Banner
+  } else if (width == 300 && height == 250) {
+    selectedSize = AdSize.mediumRectangle; // Orta Dikdörtgen (En karlı olan)
+  } else if (width == 336 && height == 280) {
+    selectedSize = AdSize(width: 336, height: 280); // Büyük Dikdörtgen
+  } else {
+    debugPrint("HATA: Standart dışı ölçü ($width x $height). Reklam yüklenmedi.");
+    return; // Eğer bu 4 ölçüden biri değilse reklam yükleme
+  }
+
+  _bannerAd = BannerAd(
+    adUnitId: Platform.isAndroid 
+        ? 'ca-app-pub-6275851890605245/6372884572' 
+        : 'ca-app-pub-6275851890605245/9377275683',
+    size: selectedSize,
+    request: const AdRequest(),
+    listener: BannerAdListener(
+      onAdLoaded: (ad) => setState(() => _isBannerAdLoaded = true),
+      onAdFailedToLoad: (ad, error) {
+        ad.dispose();
+        _isBannerAdLoaded = false;
+      },
+    ),
+  )..load();
+}
+
 DateTime _lastAdTime = DateTime.now();
 
 String get adUnitId {
@@ -235,6 +287,41 @@ String get adUnitId {
     throw UnsupportedError("Unsupported platform");
   }
 }
+
+// JavaScript Kanalı: Siteden gelen koordinatları yakalar
+void _setupBannerPositionChannel() {
+  _controller.addJavaScriptChannel(
+    'BannerPosition',
+    onMessageReceived: (message) {
+      final data = jsonDecode(message.message);
+      setState(() {
+        _adX = data['x'].toDouble();
+        _adY = data['y'].toDouble();
+        _adW = data['w'].toDouble();
+        _adH = data['h'].toDouble();
+        _isDivPresent = data['present'] as bool;
+        
+        // Eğer div varsa ve reklam yüklü değilse yükle
+        if (_isDivPresent && !_isBannerAdLoaded) {
+          _loadBannerAd();
+          _showBannerAd = true;
+        }
+      });
+    },
+  );
+}
+
+String get _storeUrl {
+  if (Platform.isAndroid) {
+    // Buraya kendi Google Play linkini yapıştır
+    return 'https://play.google.com/store/apps/details?id=net.kumpara.app';
+  } else if (Platform.isIOS) {
+    // Buraya kendi App Store linkini yapıştır
+    return 'https://apps.apple.com/tr/app/kumpara-g%C3%B6rev-yap-kazan/id6760625142?l=tr';
+  }
+  return 'https://kumpara.com.tr/indir';
+}
+
 
 // --- APP OPEN REKLAM DEĞİŞKENLERİ ---
 AppOpenAd? _appOpenAd;
@@ -304,36 +391,36 @@ void _showAppOpenAdIfReady() {
 }
 
 void _showUpdateDialog(bool forceUpdate, String url) {
-
   showDialog(
     context: context,
-    barrierDismissible: !forceUpdate,
-    builder: (_) => AlertDialog(
-      title: const Text("Uygulama Güncellemesi"),
-      content: const Text(
-        "Uygulamanın yeni bir sürümü mevcut. Güncellemek için mağazaya gidin.",
-      ),
-      actions: [
-
-        if (!forceUpdate)
-          TextButton(
-            child: const Text("Daha Sonra"),
-            onPressed: () => Navigator.pop(context),
-          ),
-
-        TextButton(
-          child: const Text("Güncelle"),
-          onPressed: () async {
-
-            final uri = Uri.parse(url);
-
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-
-          },
+    barrierDismissible: false, // Dışarı tıklayınca kapanmaz
+    builder: (_) => PopScope(
+      canPop: false, // Geri tuşunu tamamen kilitler
+      child: AlertDialog(
+        title: const Text("⚠️ Güncelleme Gerekli"),
+        content: const Text(
+          "Uygulamayı Kullanmaya Devam Edebilmek İçin Lütfen En Yeni Sürüme Güncelleyiniz!",
         ),
-      ],
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text("ŞİMDİ GÜNCELLE"),
+              onPressed: () async {
+                final uri = Uri.parse(url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -358,6 +445,19 @@ Future<void> _loadAdSettings() async {
   if (_appOpenEnabled) {
     _loadAppOpenAd();
   }
+  // --- MANUEL VERSİYON KONTROLÜ ---
+      final int latestBuildNumber = data["latest_build_number"] ?? 0;
+      
+      PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      int currentBuildNumber = int.parse(packageInfo.buildNumber);
+
+      // Eğer API'deki build numarası, telefondakinden büyükse
+      if (latestBuildNumber > currentBuildNumber) {
+        if (mounted) {
+          // forceUpdate: true olarak sabitliyoruz, kullanıcıyı zorluyoruz
+          _showUpdateDialog(true, _storeUrl);
+        }
+      }
 }
 
   } catch (e) {
@@ -604,6 +704,45 @@ if (_controller.platform is AndroidWebViewController) {
   
   
 )
+
+
+..addJavaScriptChannel(
+    'BannerControl', // YENİ KANAL: Reklamı her yerden açıp kapatmak için
+    onMessageReceived: (message) {
+      if (message.message == 'show') { 
+        _loadBannerAd();
+        setState(() => _showBannerAd = true);
+      } else if (message.message == 'hide') {
+        setState(() => _showBannerAd = false);
+        _bannerAd?.dispose();
+        _bannerAd = null;
+      }
+    },
+  )
+   
+  
+..addJavaScriptChannel(
+  'BannerPosition', 
+  onMessageReceived: (message) {
+    final data = jsonDecode(message.message);
+    setState(() {
+      _adX = data['x'].toDouble();
+      _adY = data['y'].toDouble();
+      double newW = data['w'].toDouble();
+      double newH = data['h'].toDouble();
+      _isDivPresent = data['present'] as bool;
+
+      // EĞER: Div varsa VE (Reklam hiç yüklenmemişse VEYA gelen ölçü mevcut reklamdan farklıysa)
+      if (_isDivPresent && (!_isBannerAdLoaded || _adW != newW || _adH != newH)) {
+        _adW = newW;
+        _adH = newH;
+        _loadBannerAd(_adW.toInt(), _adH.toInt());
+        _showBannerAd = true;
+      }
+    });
+  },
+)
+  
     ..setNavigationDelegate(
     NavigationDelegate(
 onNavigationRequest: (NavigationRequest request) async {
@@ -665,6 +804,32 @@ onNavigationRequest: (NavigationRequest request) async {
   onPageStarted: (_) => setState(() => _isLoading = true),
 
   onPageFinished: (String url) {
+  
+  _controller.runJavaScript('''
+    function trackBannerDiv() {
+      const el = document.getElementById('bannerreklam');
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        // Koordinatları Flutter'a gönder
+        window.BannerPosition.postMessage(JSON.stringify({
+          present: true,
+          x: rect.left,
+          y: rect.top,
+          w: rect.width,
+          h: rect.height
+        }));
+      } else {
+        window.BannerPosition.postMessage(JSON.stringify({ present: false, x:0, y:0, w:0, h:0 }));
+      }
+    }
+
+    // Hem kaydırırken hem de düzenli aralıklarla kontrol et
+    window.addEventListener('scroll', trackBannerDiv);
+    window.addEventListener('resize', trackBannerDiv);
+    setInterval(trackBannerDiv, 32); // 150ms'de bir tazele (pil dostu)
+  ''');
+  
+  
   // Mevcut JS kodlarının içine veya altına ekle:
   _controller.runJavaScript('''
     // Sayfanın en üstüne ve en altına telefonun boşluğu kadar padding ekler
@@ -801,15 +966,14 @@ WebViewController _createController() {
   return WebViewController.fromPlatformCreationParams(platformParams);
 }
  
-@override 
+@override
 Widget build(BuildContext context) {
-  return UpgradeAlert(
-  upgrader: Upgrader(
-  debugDisplayAlways: false, // Burayı test bitince false yapabilirsin
-  durationUntilAlertAgain: Duration.zero, // Her açılışta kontrol etsin
-  countryCode: 'TR',
-  languageCode: 'tr', // Bu satır zaten her şeyi Türkçe yapar
-),
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    value: const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    ),
     child: PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -821,9 +985,27 @@ Widget build(BuildContext context) {
         }
       },
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         body: Stack(
           children: [
+            // 1. KATMAN: WebView
             WebViewWidget(controller: _controller),
+
+            // 2. KATMAN: Akıllı Takipçi Reklam
+            // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
+            if (_isDivPresent && _isBannerAdLoaded && _bannerAd != null)
+              Positioned(
+                top: _adY,  // Sitedeki div'in Y koordinatı
+                left: _adX, // Sitedeki div'in X koordinatı
+                width: _adW > 0 ? _adW : 300, // Div'in genişliği (yoksa varsayılan)
+                height: _adH > 0 ? _adH : 250, // Div'in yüksekliği
+                child: Container(
+                  color: Colors.white,
+                  child: AdWidget(ad: _bannerAd!),
+                ),
+              ),
+
+            // 3. KATMAN: Loading
             if (_isLoading)
               const Center(child: CircularProgressIndicator()),
           ],
