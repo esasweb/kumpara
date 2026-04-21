@@ -710,10 +710,10 @@ if (_controller.platform is AndroidWebViewController) {
     'BannerControl', // YENİ KANAL: Reklamı her yerden açıp kapatmak için
     onMessageReceived: (message) {
       if (message.message == 'show') { 
-        _loadBannerAd();
+        
         setState(() => _showBannerAd = true);
       } else if (message.message == 'hide') {
-        setState(() => _showBannerAd = false);
+        setState(() => _showBannerAd = false); 
         _bannerAd?.dispose();
         _bannerAd = null;
       }
