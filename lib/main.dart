@@ -233,11 +233,13 @@ final Map<String, bool> _showAd = {};
 final Map<String, Offset> _adPositions = {};
 
 // Boyut tanımları
+// Mevcut _adSizes haritasını şu şekilde güncelle:
 final Map<String, AdSize> _adSizes = {
-  'bannerreklam1': AdSize.mediumRectangle, // 300x250
-  'bannerreklam2': AdSize.banner,          // 320x50
-  'bannerreklam3': AdSize.largeBanner,     // 320x100
-  'bannerreklam4': AdSize.banner,          // 320x50
+  'bannerreklam1': AdSize.mediumRectangle,
+  'bannerreklam2': AdSize.banner,
+  'bannerreklam3': AdSize.largeBanner,
+  'bannerreklam4': AdSize.banner,
+  'bannerreklam5': AdSize.banner, // 50px yükseklik için standart banner
 };
  
 void _preloadAllBanners() {
@@ -355,37 +357,101 @@ void _showAppOpenAdIfReady() {
 void _showUpdateDialog(bool forceUpdate, String url) {
   showDialog(
     context: context,
-    barrierDismissible: false, // Dışarı tıklayınca kapanmaz
+    barrierDismissible: false,
     builder: (_) => PopScope(
-      canPop: false, // Geri tuşunu tamamen kilitler
-      child: AlertDialog(
-        title: const Text("⚠️ Güncelleme Gerekli"),
-        content: const Text(
-          "Uygulamayı Kullanmaya Devam Edebilmek İçin Lütfen En Yeni Sürüme Güncelleyiniz!",
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text("ŞİMDİ GÜNCELLE"),
-              onPressed: () async {
-                final uri = Uri.parse(url);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
+      canPop: false,
+      child: Dialog(
+        // Modalın köşe keskinliği (İstediğin gibi 3px)
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(3),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Üst Kısım: İkon ve Başlık
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.system_update_rounded,
+                  size: 40,
+                  color: Colors.deepPurple,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Yeni Sürüm Hazır!",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Size daha iyi bir deneyim sunabilmek için uygulamamızı güncelledik. Devam etmek için lütfen güncelleyin.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF919191),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Buton: Border radius 3px ve tam genişlik
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(3), // İstediğin 3px radius
+                    ),
+                  ),
+                  child: const Text(
+                    "ŞİMDİ GÜNCELLE",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  onPressed: () async {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ),
+              
+              // Eğer forceUpdate değilse kapat butonu eklenebilir
+              if (!forceUpdate)
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "Daha Sonra",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     ),
-  );
-}
+  ); 
+} 
 Future<void> _loadAdSettings() async { 
   try {
     final res = await http.get(
@@ -744,33 +810,70 @@ onNavigationRequest: (NavigationRequest request) async {
   return NavigationDecision.navigate;
 },
 
-  onPageStarted: (_) => setState(() => _isLoading = true),
+  // WebViewPage içindeki NavigationDelegate bölümünde:
+onPageStarted: (String url) {
+  setState(() {
+    _isLoading = true;
+    // Sayfa değiştiği an tüm bannerları ve pozisyonları temizle
+    _showAd.clear(); 
+    _adPositions.clear();
+  });
+},
 
   onPageFinished: (String url) {
   
 
-   _controller.runJavaScript('''
-        function trackBanners() {
-            const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4'];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (el && el.offsetParent !== null) {
-                    const rect = el.getBoundingClientRect();
+_controller.runJavaScript('''
+    var lastSentPositions = {};
+
+    function trackBanners() {
+       // onPageFinished içindeki ids listesini şu şekilde güncelle:
+const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4', 'bannerreklam5'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.offsetParent !== null) {
+                const rect = el.getBoundingClientRect();
+                const currentX = rect.left;
+                const currentY = rect.top;
+
+                if (!lastSentPositions[id] || 
+                    Math.abs(lastSentPositions[id].x - currentX) > 0.5 || 
+                    Math.abs(lastSentPositions[id].y - currentY) > 0.5 || 
+                    lastSentPositions[id].present !== true) {
+                    
+                    lastSentPositions[id] = { x: currentX, y: currentY, present: true };
                     window.BannerPosition.postMessage(JSON.stringify({
                         id: id,
                         present: true,
-                        x: rect.left,
-                        y: rect.top
+                        x: currentX,
+                        y: currentY
                     }));
-                } else {
+                }
+            } else {
+                if (!lastSentPositions[id] || lastSentPositions[id].present !== false) {
+                    lastSentPositions[id] = { present: false };
                     window.BannerPosition.postMessage(JSON.stringify({ id: id, present: false }));
                 }
-            });
-        }
-        window.addEventListener('scroll', trackBanners);
-        setInterval(trackBanners, 250); 
-        trackBanners();
-    ''');
+            }
+        });
+    }
+
+    // Olayları dinle
+    window.addEventListener('scroll', trackBanners);
+    window.addEventListener('resize', trackBanners);
+    
+    // Sayfa içindeki her türlü yer değişimini (resim yüklenmesi vb.) izler
+    if (window.ResizeObserver) {
+        const observer = new ResizeObserver(trackBanners);
+        document.body.childNodes.forEach(node => {
+            if(node.nodeType === 1) observer.observe(node);
+        });
+    }
+
+    // Periyodik kontrolü hızlandır (Görünürlük ve ani değişimler için)
+    setInterval(trackBanners, 100); 
+    trackBanners();
+''');
 
 
   
@@ -939,25 +1042,44 @@ Widget build(BuildContext context) {
 
             // 2. KATMAN: Akıllı Takipçi Reklam
             // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
-         ..._adSizes.keys.map((id) {
-    final position = _adPositions[id]; // Pozisyonu değişkene al
-    if (_showAd[id] == true && 
-        _isAdLoaded[id] == true && 
-        _bannerAds[id] != null && 
-        position != null) { // <--- Burada null kontrolü şart
+        // build metodu içindeki Stack katmanı:
+..._adSizes.keys.map((id) {
+  final position = _adPositions[id];
+  
+  if (_showAd[id] == true &&  
+      _isAdLoaded[id] == true && 
+      _bannerAds[id] != null && 
+      position != null) {
+
+    // bannerreklam5 için Full-Width kuralı
+    if (id == 'bannerreklam5') {
       return Positioned(
         top: position.dy,
-        left: position.dx,
-                  width: _adSizes[id]!.width.toDouble(),
-                  height: _adSizes[id]!.height.toDouble(),
-                  child: Container(
-                    color: Colors.white,
-                    child: AdWidget(ad: _bannerAds[id]!),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            }).toList(),
+        left: 0,
+        right: 0,
+        height: 50,
+        child: Container( 
+          color: Colors.white,
+          alignment: Alignment.center,
+          child: AdWidget(ad: _bannerAds[id]!),
+        ),
+      );
+    }
+
+    // Diğer reklamlar için standart kurallar
+    return Positioned(
+      top: position.dy,
+      left: position.dx,
+      width: _adSizes[id]!.width.toDouble(),
+      height: _adSizes[id]!.height.toDouble(),
+      child: Container(
+        color: Colors.white,
+        child: AdWidget(ad: _bannerAds[id]!),
+      ),
+    );
+  }
+  return const SizedBox.shrink();
+}).toList(),
 
             // 3. KATMAN: Loading
             if (_isLoading)

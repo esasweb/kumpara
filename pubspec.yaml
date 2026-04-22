@@ -2,7 +2,7 @@ name: flutter_app
 description: 'Kumpara Mobil Uygulaması'
 publish_to: 'none'
 
-version: 1.0.15+20
+version: 1.0.16+21
 
 environment:
   sdk: ^3.10.1
@@ -23,7 +23,7 @@ dependencies:
   # Dosya Seçme (Android için eklediğimiz)
   file_picker: ^8.0.0
   in_app_review: ^2.0.9
-
+ 
   # Link ve URL Yönetimi 
   url_launcher: ^6.2.5
   app_links: ^6.3.2 
