@@ -193,7 +193,7 @@ class MyApp extends StatelessWidget {
       ],
       locale: const Locale('tr', 'TR'), 
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF0F0C29)),
         useMaterial3: true,
       ),
       home: const WebViewPage(),
@@ -376,13 +376,13 @@ void _showUpdateDialog(bool forceUpdate, String url) {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.1),
+                  color: Color(0xFF0F0C29).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.system_update_rounded,
                   size: 40,
-                  color: Colors.deepPurple,
+                  color: Color(0xFF0F0C29),
                 ),
               ),
               const SizedBox(height: 20),
@@ -413,7 +413,7 @@ void _showUpdateDialog(bool forceUpdate, String url) {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Color(0xFF0F0C29),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -831,8 +831,9 @@ _controller.runJavaScript('''
 const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4', 'bannerreklam5'];
         ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el && el.offsetParent !== null) {
-                const rect = el.getBoundingClientRect();
+           if (el && (el.offsetParent !== null || getComputedStyle(el).position === 'fixed')) {
+ 
+                const rect = el.getBoundingClientRect();  
                 const currentX = rect.left;
                 const currentY = rect.top;
 
