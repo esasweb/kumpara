@@ -226,54 +226,38 @@ int _minSecondsBetweenAds = 90;
 bool _appOpenEnabled = false;
 int _appOpenCooldown = 30;
 
-// _WebViewPageState sınıfının içindeki değişkenleri şu şekilde güncelle:
-BannerAd? _bannerAd;
-bool _isBannerAdLoaded = false;
-bool _showBannerAd = false; 
+// Eski banner değişkenlerini sil, bunları ekle:
+final Map<String, BannerAd?> _bannerAds = {};
+final Map<String, bool> _isAdLoaded = {};
+final Map<String, bool> _showAd = {};
+final Map<String, Offset> _adPositions = {};
 
-// Koordinat değişkenleri
-double _adX = 0;
-double _adY = 0;
-double _adW = 0;
-double _adH = 0;
-bool _isDivPresent = false; // Sitede o div var mı?
+// Boyut tanımları
+final Map<String, AdSize> _adSizes = {
+  'bannerreklam1': AdSize.mediumRectangle, // 300x250
+  'bannerreklam2': AdSize.banner,          // 320x50
+  'bannerreklam3': AdSize.largeBanner,     // 320x100
+  'bannerreklam4': AdSize.banner,          // 320x50
+};
  
-// Reklam yükleme fonksiyonu (ID'lerin içine gömülü)
-void _loadBannerAd(int width, int height) {
-  _bannerAd?.dispose();
-  _isBannerAdLoaded = false;
-
-  AdSize selectedSize;
-
-  // Ölçüleri 5 piksellik yanılma payıyla kontrol et
-  if ((width - 320).abs() < 5 && (height - 50).abs() < 5) {
-    selectedSize = AdSize.banner;
-  } else if ((width - 320).abs() < 5 && (height - 100).abs() < 5) {
-    selectedSize = AdSize.largeBanner;
-  } else if ((width - 300).abs() < 5 && (height - 250).abs() < 5) {
-    selectedSize = AdSize.mediumRectangle; // Senin HTML'deki ölçün
-  } else if ((width - 336).abs() < 5 && (height - 280).abs() < 5) {
-    selectedSize = AdSize(width: 336, height: 280);
-  } else {
-    // Eğer hiçbirine uymuyorsa, HTML'den gelen ölçüyü zorla kullanmayı dene (Riskli ama reklamı gösterir)
-    selectedSize = AdSize(width: width, height: height);
+void _preloadAllBanners() {
+    _adSizes.forEach((id, size) {
+      _bannerAds[id] = BannerAd(
+        adUnitId: Platform.isAndroid 
+            ? 'ca-app-pub-6275851890605245/6372884572' 
+            : 'ca-app-pub-6275851890605245/9377275683',
+        size: size,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) => setState(() => _isAdLoaded[id] = true),
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+            debugPrint("$id yüklenemedi: ${error.message}");
+          },
+        ),
+      )..load();
+    });
   }
-
-  _bannerAd = BannerAd( 
-    adUnitId: Platform.isAndroid 
-        ? 'ca-app-pub-6275851890605245/6372884572' 
-        : 'ca-app-pub-6275851890605245/9377275683',
-    size: selectedSize,
-    request: const AdRequest(),
-    listener: BannerAdListener(
-      onAdLoaded: (ad) => setState(() => _isBannerAdLoaded = true),
-      onAdFailedToLoad: (ad, error) {
-        debugPrint("Reklam yükleme hatası: ${error.message}");
-        ad.dispose();
-      },
-    ),
-  )..load();
-}
 
 DateTime _lastAdTime = DateTime.now();
 
@@ -287,28 +271,7 @@ String get adUnitId {
   }
 }
 
-// JavaScript Kanalı: Siteden gelen koordinatları yakalar
-void _setupBannerPositionChannel() {
-  _controller.addJavaScriptChannel(
-    'BannerPosition',
-    onMessageReceived: (message) {
-      final data = jsonDecode(message.message);
-      setState(() {
-        _adX = data['x'].toDouble();
-        _adY = data['y'].toDouble();
-        _adW = data['w'].toDouble();
-        _adH = data['h'].toDouble();
-        _isDivPresent = data['present'] as bool;
-        
-        // Eğer div varsa ve reklam yüklü değilse yükle
-        if (_isDivPresent && !_isBannerAdLoaded) {
-          _loadBannerAd(data['w'].toInt(), data['h'].toInt());
-          _showBannerAd = true;
-        }
-      });
-    }, 
-  );
-}
+
  
 String get _storeUrl {
   if (Platform.isAndroid) {
@@ -640,9 +603,10 @@ void initState() {
 
   WidgetsBinding.instance.addObserver(this);
 _loadAdSettings().then((_) {
-    _loadAd();
-    _loadAppOpenAd(); // Ayarlar gelince reklamı önceden yükle
-  });
+      _loadAd();
+      _preloadAllBanners(); // Bunu ekledik, 4 reklamı arkada yükler.
+      _loadAppOpenAd();
+    });
 _loadRewardedAd();
 
   _controller = _createController();
@@ -705,41 +669,21 @@ if (_controller.platform is AndroidWebViewController) {
 )
 
 
+
+  
+// initState içindeki BannerControl kanalı yerine şunları kullandığından emin ol:
 ..addJavaScriptChannel(
-    'BannerControl', // YENİ KANAL: Reklamı her yerden açıp kapatmak için
+    'BannerPosition',
     onMessageReceived: (message) {
-      if (message.message == 'show') { 
-        
-        setState(() => _showBannerAd = true);
-      } else if (message.message == 'hide') {
-        setState(() => _showBannerAd = false); 
-        _bannerAd?.dispose();
-        _bannerAd = null;
+      final data = jsonDecode(message.message);
+      final String id = data['id'];
+      if (mounted) {
+        setState(() { 
+          _adPositions[id] = Offset(data['x'].toDouble(), data['y'].toDouble());
+          _showAd[id] = data['present'] as bool;
+        });
       }
     },
-  )
-   
-  
-..addJavaScriptChannel(
-  'BannerPosition', 
-  onMessageReceived: (message) {
-    final data = jsonDecode(message.message);
-    setState(() {
-      _adX = data['x'].toDouble();
-      _adY = data['y'].toDouble();
-      double newW = data['w'].toDouble();
-      double newH = data['h'].toDouble();
-      _isDivPresent = data['present'] as bool;
-
-      // EĞER: Div varsa VE (Reklam hiç yüklenmemişse VEYA gelen ölçü mevcut reklamdan farklıysa)
-      if (_isDivPresent && (!_isBannerAdLoaded || _adW != newW || _adH != newH)) {
-        _adW = newW;
-        _adH = newH;
-        _loadBannerAd(_adW.toInt(), _adH.toInt());
-        _showBannerAd = true;
-      }
-    });
-  },
 )
   
     ..setNavigationDelegate(
@@ -804,39 +748,31 @@ onNavigationRequest: (NavigationRequest request) async {
 
   onPageFinished: (String url) {
   
- _controller.runJavaScript('''
-    var lastX, lastY, lastW, lastH;
-    
-    function trackBannerDiv() {
-      const el = document.getElementById('bannerreklam');
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        
-        // Sadece koordinatlar değiştiyse mesaj gönder (Performans için KRİTİK)
-        if (lastX !== rect.left || lastY !== rect.top || lastW !== rect.width || lastH !== rect.height) {
-          lastX = rect.left;
-          lastY = rect.top;
-          lastW = rect.width;
-          lastH = rect.height;
-          
-          window.BannerPosition.postMessage(JSON.stringify({
-            present: true,
-            x: rect.left,
-            y: rect.top,
-            w: Math.round(rect.width), // Tam sayıya yuvarla
-            h: Math.round(rect.height) // Tam sayıya yuvarla
-          }));
-        }
-      } else {
-        window.BannerPosition.postMessage(JSON.stringify({ present: false, x:0, y:0, w:0, h:0 }));
-      }
-    }
 
-    // 32ms yerine 200ms yap (Gözle fark edilmez ama işlemciyi kurtarır)
-    setInterval(trackBannerDiv, 200); 
-    window.addEventListener('scroll', trackBannerDiv);
-  ''');
-  
+   _controller.runJavaScript('''
+        function trackBanners() {
+            const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.offsetParent !== null) {
+                    const rect = el.getBoundingClientRect();
+                    window.BannerPosition.postMessage(JSON.stringify({
+                        id: id,
+                        present: true,
+                        x: rect.left,
+                        y: rect.top
+                    }));
+                } else {
+                    window.BannerPosition.postMessage(JSON.stringify({ id: id, present: false }));
+                }
+            });
+        }
+        window.addEventListener('scroll', trackBanners);
+        setInterval(trackBanners, 250); 
+        trackBanners();
+    ''');
+
+
   
   // Mevcut JS kodlarının içine veya altına ekle:
   _controller.runJavaScript('''
@@ -921,14 +857,16 @@ OneSignal.User.addTagWithKey("user_id", uid);
   }
 
 @override
-void dispose() {
-  WidgetsBinding.instance.removeObserver(this);
-  _sub?.cancel();
-  _interstitialAd?.dispose();
-  _rewardedAd?.dispose();
-  _appOpenAd?.dispose(); // BU SATIRI EKLE
-  super.dispose();
-}
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sub?.cancel();
+    _interstitialAd?.dispose();
+    _rewardedAd?.dispose();
+    _appOpenAd?.dispose();
+    // Bannerları temizle
+    _bannerAds.values.forEach((ad) => ad?.dispose());
+    super.dispose();
+  }
  
  
 
@@ -1001,17 +939,25 @@ Widget build(BuildContext context) {
 
             // 2. KATMAN: Akıllı Takipçi Reklam
             // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
-            if (_isDivPresent && _isBannerAdLoaded && _bannerAd != null)
-              Positioned(
-                top: _adY,  // Sitedeki div'in Y koordinatı
-                left: _adX, // Sitedeki div'in X koordinatı
-                width: _adW > 0 ? _adW : 300, // Div'in genişliği (yoksa varsayılan)
-                height: _adH > 0 ? _adH : 250, // Div'in yüksekliği
-                child: Container(
-                  color: Colors.white,
-                  child: AdWidget(ad: _bannerAd!),
-                ),
-              ),
+         ..._adSizes.keys.map((id) {
+    final position = _adPositions[id]; // Pozisyonu değişkene al
+    if (_showAd[id] == true && 
+        _isAdLoaded[id] == true && 
+        _bannerAds[id] != null && 
+        position != null) { // <--- Burada null kontrolü şart
+      return Positioned(
+        top: position.dy,
+        left: position.dx,
+                  width: _adSizes[id]!.width.toDouble(),
+                  height: _adSizes[id]!.height.toDouble(),
+                  child: Container(
+                    color: Colors.white,
+                    child: AdWidget(ad: _bannerAds[id]!),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }).toList(),
 
             // 3. KATMAN: Loading
             if (_isLoading)
