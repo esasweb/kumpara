@@ -52,14 +52,32 @@ Future<void> main() async {
     FlutterError.presentError(details);
   };
 
-  OneSignal.initialize('c19bfcc0-96e5-43ae-b482-f38b2be22b76');
+OneSignal.initialize('c19bfcc0-96e5-43ae-b482-f38b2be22b76');
 
-  OneSignal.User.addObserver((OSUserChangedState state) {
-    final id = state.current.onesignalId;
-    if (id != null && id.isNotEmpty) {
-      _saveOneSignalIdAndNotify(id);
+OneSignal.User.addObserver((OSUserChangedState state) {
+  final id = state.current.onesignalId;
+  if (id != null && id.isNotEmpty) {
+    _saveOneSignalIdAndNotify(id);
+  }
+});
+
+// SADECE ANDROID: Push subscription gelince backend'e doğru ID'yi yaz
+if (Platform.isAndroid) {
+  OneSignal.User.pushSubscription.addObserver((state) {
+    final subId = state.current.id;
+    final token = state.current.token;
+    final optedIn = state.current.optedIn;
+
+    debugPrint("ANDROID ONESIGNAL SUB ID: $subId");
+    debugPrint("ANDROID ONESIGNAL TOKEN: $token");
+    debugPrint("ANDROID ONESIGNAL OPTED IN: $optedIn");
+
+    if (subId != null && subId.isNotEmpty) {
+      _saveOneSignalIdAndNotify(subId);
     }
   });
+}
+  
 
   runApp(const MyApp());
 }
@@ -71,57 +89,58 @@ Future<void> requestNotificationPermission(BuildContext context) async {
   final String lastPromptKey = 'last_notification_prompt_date';
   final String today = DateTime.now().toIso8601String().split('T')[0];
 
-  // 1. ADIM: Bugün zaten sorduk mu? (En başa aldık)
-  final String? lastPromptDate = prefs.getString(lastPromptKey);
-  if (lastPromptDate == today) {
-    debugPrint("Bildirim izni bugün zaten soruldu.");
-    return; 
+  bool hasPermission = OneSignal.Notifications.permission;
+
+  if (!hasPermission) {
+    final String? lastPromptDate = prefs.getString(lastPromptKey);
+
+    if (lastPromptDate != today) {
+      hasPermission = await OneSignal.Notifications.requestPermission(true);
+      await prefs.setString(lastPromptKey, today);
+    }
   }
 
- bool hasPermission = OneSignal.Notifications.permission;
+  // SADECE ANDROID: izin varsa push aboneliğini zorla aç
+  if (Platform.isAndroid && hasPermission) {
+    await OneSignal.User.pushSubscription.optIn();
 
-if (!hasPermission) {
-  await OneSignal.Notifications.requestPermission(true);
-}
+    final subId = OneSignal.User.pushSubscription.id;
+    final token = OneSignal.User.pushSubscription.token;
 
-await _syncOneSignalIdToBackendIfReady();
+    debugPrint("ANDROID AFTER OPTIN SUB ID: $subId");
+    debugPrint("ANDROID AFTER OPTIN TOKEN: $token");
 
-  // 3. ADIM: Bugün sormadıysak ve izin yoksa, SİSTEM penceresini aç
-  // Not: Kullanıcı daha önce "Asla" dediyse bu pencere açılmaz, direkt false döner.
-  bool result = await OneSignal.Notifications.requestPermission(true);
-
-  // 4. ADIM: Eğer sistem penceresinde reddettiyse veya daha önce reddetmişse
-  if (!result) {
-    if (context.mounted) {
-      // Bugün sorduğumuzu kaydedelim (Diyaloğu göstersek de göstermesek de)
-      await prefs.setString(lastPromptKey, today);
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          title: const Text("Bildirimler Kapalı!"),
-          content: const Text(
-            "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir. Lütfen ayarlardan bildirimleri açın.",
-          ),
-          actions: [  
-            TextButton(
-              child: const Text("Kapat"),
-              onPressed: () => Navigator.pop(context),
-            ),
-            ElevatedButton(
-            child: const Text("Ayarlara Git"),
-  onPressed: () {
-    Navigator.pop(context);
-    // Bu komut, kullanıcıyı hiiiç soru sormadan direkt 
-    // telefonun Ayarlar > Kumpara sayfasına ışınlar.
-    AppSettings.openAppSettings(type: AppSettingsType.notification);
-  },
-            ),
-          ],
-        ),
-      );
+    if (subId != null && subId.isNotEmpty) {
+      await _saveOneSignalIdAndNotify(subId);
     }
+  }
+
+  await _syncOneSignalIdToBackendIfReady();
+
+  if (!hasPermission && context.mounted) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("Bildirimler Kapalı!"),
+        content: const Text(
+          "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir. Lütfen ayarlardan bildirimleri açın.",
+        ),
+        actions: [
+          TextButton(
+            child: const Text("Kapat"),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            child: const Text("Ayarlara Git"),
+            onPressed: () {
+              Navigator.pop(context);
+              AppSettings.openAppSettings(type: AppSettingsType.notification);
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -955,10 +974,25 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
       
 
       final prefs = await SharedPreferences.getInstance();
-	   OneSignal.login(uid);
+	 OneSignal.login(uid);
 OneSignal.User.addTagWithKey("user_id", uid);
-      await prefs.setString(_kUserIdStorageKey, uid);
-      await _syncOneSignalIdToBackendIfReady();
+
+if (Platform.isAndroid) {
+  await OneSignal.User.pushSubscription.optIn();
+
+  final subId = OneSignal.User.pushSubscription.id;
+  final token = OneSignal.User.pushSubscription.token;
+
+  debugPrint("ANDROID LOGIN SUB ID: $subId");
+  debugPrint("ANDROID LOGIN TOKEN: $token");
+
+  if (subId != null && subId.isNotEmpty) {
+    await _saveOneSignalIdAndNotify(subId);
+  }
+}
+
+await prefs.setString(_kUserIdStorageKey, uid);
+await _syncOneSignalIdToBackendIfReady();
     } catch (_) {
       debugPrint('user_id URL parse hatası: $url');
     }
