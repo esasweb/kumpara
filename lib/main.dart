@@ -78,9 +78,13 @@ Future<void> requestNotificationPermission(BuildContext context) async {
     return; 
   }
 
-  // 2. ADIM: Mevcut izin durumunu kontrol et (Sormadan önce)
-  bool hasPermission = OneSignal.Notifications.permission;
-  if (hasPermission) return; // Zaten izin var, bir şey yapma.
+ bool hasPermission = OneSignal.Notifications.permission;
+
+if (!hasPermission) {
+  await OneSignal.Notifications.requestPermission(true);
+}
+
+await _syncOneSignalIdToBackendIfReady();
 
   // 3. ADIM: Bugün sormadıysak ve izin yoksa, SİSTEM penceresini aç
   // Not: Kullanıcı daha önce "Asla" dediyse bu pencere açılmaz, direkt false döner.
