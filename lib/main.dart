@@ -145,7 +145,7 @@ Future<void> requestNotificationPermission(BuildContext context) async {
 }
 
  
-void _saveOneSignalIdAndNotify(String id) async {
+Future<void> _saveOneSignalIdAndNotify(String id) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_kOneSignalIdStorageKey, id);
 
