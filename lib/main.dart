@@ -114,34 +114,102 @@ Future<void> requestNotificationPermission(BuildContext context) async {
       await _saveOneSignalIdAndNotify(subId);
     }
   }
-
+await _forceOneSignalSubscribeIfAllowed();
   await _syncOneSignalIdToBackendIfReady();
 
+
   if (!hasPermission && context.mounted) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: const Text("Bildirimler Kapalı!"),
-        content: const Text(
-          "Görev ve kanıt bildirimleri için bildirim izni vermeniz gerekir. Lütfen ayarlardan bildirimleri açın.",
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF635BEA).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.notifications_off_rounded,
+                  size: 40,
+                  color: Color(0xFF635BEA),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Bildirimler Kapalı!",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Görev, kazanç ve onay bildirimlerini kaçırmamak için bildirim iznini açmanız gerekir.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF919191),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF635BEA),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  child: const Text(
+                    "AYARLARA GİT",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    AppSettings.openAppSettings(type: AppSettingsType.notification);
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Daha Sonra",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            child: const Text("Kapat"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton(
-            child: const Text("Ayarlara Git"),
-            onPressed: () {
-              Navigator.pop(context);
-              AppSettings.openAppSettings(type: AppSettingsType.notification);
-            },
-          ),
-        ],
       ),
-    );
-  }
+    ),
+  );
+}
+  
+  
 }
 
  
@@ -151,6 +219,32 @@ Future<void> _saveOneSignalIdAndNotify(String id) async {
 
   await _syncOneSignalIdToBackendIfReady();
 }
+
+
+
+Future<void> _forceOneSignalSubscribeIfAllowed() async {
+if (!Platform.isAndroid) return;
+  final hasPermission = OneSignal.Notifications.permission;
+
+  if (!hasPermission) return;
+
+  await OneSignal.User.pushSubscription.optIn();
+
+  await Future.delayed(const Duration(seconds: 2));
+
+  final subId = OneSignal.User.pushSubscription.id;
+  final token = OneSignal.User.pushSubscription.token;
+  final optedIn = OneSignal.User.pushSubscription.optedIn;
+
+  debugPrint("FORCE SUB ID: $subId");
+  debugPrint("FORCE TOKEN: $token");
+  debugPrint("FORCE OPTED IN: $optedIn");
+
+  if (subId != null && subId.isNotEmpty) {
+    await _saveOneSignalIdAndNotify(subId);
+  }
+}
+
 
 /// Hem user_id hem onesignal_id storage'da varsa Laravel API'ye gönderir; sonucu syncResultToShowModal ile UI'da alert olarak gösterir
 Future<void> _syncOneSignalIdToBackendIfReady() async {
@@ -216,7 +310,7 @@ class MyApp extends StatelessWidget {
       ],
       locale: const Locale('tr', 'TR'), 
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF0F0C29)),
+        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF635BEA)),
         useMaterial3: true,
       ),
       home: const WebViewPage(),
@@ -399,13 +493,13 @@ void _showUpdateDialog(bool forceUpdate, String url) {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFF0F0C29).withOpacity(0.1),
+                  color: Color(0xFF635BEA).withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.system_update_rounded,
                   size: 40,
-                  color: Color(0xFF0F0C29),
+                  color: Color(0xFF635BEA),
                 ),
               ),
               const SizedBox(height: 20),
@@ -436,7 +530,7 @@ void _showUpdateDialog(bool forceUpdate, String url) {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0F0C29),
+                    backgroundColor: Color(0xFF635BEA),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -498,17 +592,17 @@ Future<void> _loadAdSettings() async {
   }
   // --- MANUEL VERSİYON KONTROLÜ ---
       final int latestBuildNumber = data["latest_build_number"] ?? 0;
+	  final bool forceUpdate = data["force_update"] ?? false;
       
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       int currentBuildNumber = int.parse(packageInfo.buildNumber);
 
       // Eğer API'deki build numarası, telefondakinden büyükse
-      if (latestBuildNumber > currentBuildNumber) {
-        if (mounted) {
-          // forceUpdate: true olarak sabitliyoruz, kullanıcıyı zorluyoruz
-          _showUpdateDialog(true, _storeUrl);
-        }
-      }
+     if (latestBuildNumber > currentBuildNumber) {
+  if (mounted) {
+    _showUpdateDialog(forceUpdate, _storeUrl);
+  }
+}
 }
 
   } catch (e) {
@@ -744,6 +838,11 @@ if (_controller.platform is AndroidWebViewController) {
     }
   });
 
+
+OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+  // Uygulama açıkken de sistem bildirimi olarak göster
+  event.notification.display();
+});
   
 
   _controller
@@ -992,6 +1091,7 @@ if (Platform.isAndroid) {
 }
 
 await prefs.setString(_kUserIdStorageKey, uid);
+await _forceOneSignalSubscribeIfAllowed();
 await _syncOneSignalIdToBackendIfReady();
     } catch (_) {
       debugPrint('user_id URL parse hatası: $url');
