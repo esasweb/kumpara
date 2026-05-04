@@ -443,50 +443,7 @@ String get appOpenAdUnitId {
 }
 
 
-Future<void> _loadBanner5FullWidth() async {
-  final int width = MediaQuery.of(context).size.width.truncate();
 
-  final AnchoredAdaptiveBannerAdSize? adSize =
-      await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
-
-  if (adSize == null) return;
-
-  _banner5Height = adSize.height.toDouble();
-
-  _banner5Ad = BannerAd(
-    adUnitId: Platform.isAndroid
-        ? 'ca-app-pub-6275851890605245/6372884572'
-        : 'ca-app-pub-6275851890605245/9377275683',
-    size: adSize,
-    request: const AdRequest(),
-    listener: BannerAdListener(
-      onAdLoaded: (ad) {
-        if (mounted) {
-          setState(() => _banner5Loaded = true);
-
-          _controller.runJavaScript("""
-            document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px');
-
-            var banner = document.getElementById('bannerreklam5');
-            if (banner) {
-              banner.style.height = '${_banner5Height}px';
-              banner.style.minHeight = '${_banner5Height}px';
-            }
-
-            var main = document.querySelector('main.flex-grow-1');
-            if (main) {
-              main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
-            }
-          """);
-        }
-      },
-      onAdFailedToLoad: (ad, error) {
-        ad.dispose();
-        debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
-      },
-    ),
-  )..load();
-}
 
 // Reklamı yükle (Pre-load)
 void _loadAppOpenAd() {
@@ -1026,7 +983,7 @@ _controller.runJavaScript('''
 
     function trackBanners() {
        // onPageFinished içindeki ids listesini şu şekilde güncelle:
-const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4', 'bannerreklam5'];
+const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4'];
         ids.forEach(id => {
             const el = document.getElementById(id);
            if (el && (el.offsetParent !== null || getComputedStyle(el).position === 'fixed')) {
@@ -1053,7 +1010,7 @@ const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4',
                     lastSentPositions[id] = { present: false };
                     window.BannerPosition.postMessage(JSON.stringify({ id: id, present: false }));
                 }
-            }
+            } 
         });
     }
 
@@ -1178,7 +1135,7 @@ await _syncOneSignalIdToBackendIfReady();
     _appOpenAd?.dispose();
     // Bannerları temizle
     _bannerAds.values.forEach((ad) => ad?.dispose());
-	_banner5Ad?.dispose();
+	
     super.dispose();
 	
   }
