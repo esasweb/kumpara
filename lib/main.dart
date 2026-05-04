@@ -84,8 +84,6 @@ if (Platform.isAndroid) {
 
 
 
-
-
 Future<void> requestNotificationPermission(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   final String lastPromptKey = 'last_notification_prompt_date';
@@ -341,8 +339,6 @@ class WebViewPage extends StatefulWidget {
   State<WebViewPage> createState() => _WebViewPageState();
 }
 
-
-
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver{
   static const String _initialUrl = 'https://www.kumpara.com.tr/mobil/';
   late final WebViewController _controller;
@@ -377,8 +373,7 @@ final Map<String, AdSize> _adSizes = {
   'bannerreklam4': AdSize.banner,
  
 };
-BannerAd? _banner5Ad;
-bool _banner5Loaded = false;
+
  
 void _preloadAllBanners() {
     _adSizes.forEach((id, size) {
@@ -398,18 +393,6 @@ void _preloadAllBanners() {
       )..load();
     });
   }
-  
-  
-  Future<void> _prepareBannerHeight() async {
-  final int width = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize.width
-      ~/ WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
-
-  final adSize = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
-
-  if (adSize != null) {
-    _banner5Height = adSize.height.toDouble();
-  }
-}
 
 void _retryConnection() {
   setState(() {
@@ -469,27 +452,6 @@ Future<void> _loadBanner5FullWidth() async {
   if (adSize == null) return;
 
   _banner5Height = adSize.height.toDouble();
-  
-  _controller.runJavaScript("""
-  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px', 'important');
-
-  var banner = document.getElementById('bannerreklam5');
-  if (banner) {
-    banner.style.height = '${_banner5Height}px';
-    banner.style.minHeight = '${_banner5Height}px';
-  }
-
-  var main = document.querySelector('main.flex-grow-1');
-  if (main) {
-    main.classList.add('has-banner');
-    main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
-  }
-
-  var dbg = document.getElementById('debugBannerHeight');
-  if (dbg) {
-    dbg.innerText = 'Adaptive ready: ${_banner5Height}px';
-  }
-""");
 
   _banner5Ad = BannerAd(
     adUnitId: Platform.isAndroid
@@ -516,33 +478,12 @@ Future<void> _loadBanner5FullWidth() async {
               main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
             }
           """);
-        } 
+        }
       },
       onAdFailedToLoad: (ad, error) {
-  ad.dispose();
-  debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
-
-  if (mounted) {
-    setState(() => _banner5Loaded = false);
-  }
-
-  _controller.runJavaScript("""
-    document.documentElement.style.setProperty('--app-banner-height', '0px', 'important');
-
-    var banner = document.getElementById('bannerreklam5');
-    if (banner) {
-      banner.style.display = 'none';
-      banner.style.height = '0px';
-      banner.style.minHeight = '0px';
-    }
-
-    var main = document.querySelector('main.flex-grow-1');
-    if (main) {
-      main.classList.remove('has-banner');
-      main.style.paddingTop = '72px';
-    }
-  """);
-},
+        ad.dispose();
+        debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
+      },
     ),
   )..load();
 }
@@ -921,15 +862,12 @@ _loadAdSettings().then((_) {
     });
 _loadRewardedAd();
 
-_controller = _createController();
-
-
-WidgetsBinding.instance.addPostFrameCallback((_) async {
-  await _prepareBannerHeight();
-  await _loadBanner5FullWidth();
+WidgetsBinding.instance.addPostFrameCallback((_) {
+  
 });
 
-
+  _controller = _createController();
+   
   
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
@@ -1082,35 +1020,10 @@ onPageStarted: (String url) {
 
   onPageFinished: (String url) {
   
- setState(() {
-    _showAd.clear();
-    _adPositions.clear();
-  });
-  
-_controller.runJavaScript("""
-  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px', 'important');
-
-  var banner = document.getElementById('bannerreklam5');
-  if (banner) {
-    banner.style.height = '${_banner5Height}px';
-    banner.style.minHeight = '${_banner5Height}px';
-  }
-
-  var main = document.querySelector('main.flex-grow-1');
-  if (main) {
-    main.classList.add('has-banner');
-    main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
-  } 
-
-  var dbg = document.getElementById('debugBannerHeight');
-  if (dbg) {
-    dbg.innerText = 'onPageFinished: ${_banner5Height}px';
-  }
-""");
 
 _controller.runJavaScript('''
     var lastSentPositions = {};
- 
+
     function trackBanners() {
        // onPageFinished içindeki ids listesini şu şekilde güncelle:
 const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4', 'bannerreklam5'];
@@ -1145,6 +1058,8 @@ const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4',
     }
 
    setTimeout(trackBanners, 300);
+setTimeout(trackBanners, 800);
+setTimeout(trackBanners, 1500);
 ''');
 
 
@@ -1175,26 +1090,21 @@ _maybeShowAd();
   _maybeShowReviewDialog();
 
 // --- YATAY KAYDIRMAYI ENGELLEME VE GİZLEME KODU ---
-_controller.runJavaScript('''
-  var style = document.createElement('style');
-  style.type = 'text/css';
-  style.innerHTML = `
-    html, body {
-      overflow-x: hidden !important;
-      width: 100% !important;
-      position: relative !important;
-
-      /* 🔥 BURAYI EKLE */
-      overscroll-behavior: none !important;
-      overscroll-behavior-y: none !important;
-    }
-
-    ::-webkit-scrollbar {
-      display: none !important;
-    }
-  `;
-  document.getElementsByTagName('head')[0].appendChild(style);
-''');
+  _controller.runJavaScript('''
+    var style = document.createElement('style');
+    style.type = 'text/css';
+    style.innerHTML = `
+      html, body {
+        overflow-x: hidden !important; /* Yatay kaydırmayı tamamen kapat */
+        width: 100% !important;
+        position: relative !important;
+      }
+      ::-webkit-scrollbar {
+        display: none !important; /* Kaydırma çubuklarını tamamen gizle (isteğe bağlı) */
+      }
+    `;
+    document.getElementsByTagName('head')[0].appendChild(style);
+  ''');
   // ------------------------------------------------
   
 },
@@ -1349,30 +1259,7 @@ NotificationListener<OverscrollIndicatorNotification>(
   child: WebViewWidget(controller: _controller),
 ),
 
-if (_banner5Loaded &&
-    _banner5Ad != null &&
-    _showAd['bannerreklam5'] == true &&
-    _adPositions['bannerreklam5'] != null)
-  Positioned(
-    top: _adPositions['bannerreklam5']!.dy,
-    left: 0,
-    right: 0,
-   height: _banner5Height,
-child: Container(
-  width: double.infinity,
-  height: _banner5Height,
-  margin: EdgeInsets.zero,
-  padding: EdgeInsets.zero,
-  alignment: Alignment.center,
-  clipBehavior: Clip.hardEdge,
-  decoration: const BoxDecoration(color: Colors.white),
- child: SizedBox(
-  width: _banner5Ad!.size.width.toDouble(),
-  height: _banner5Ad!.size.height.toDouble(),
-  child: AdWidget(ad: _banner5Ad!),
-),
-),
-  ),
+
   
             // 2. KATMAN: Akıllı Takipçi Reklam
             // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
