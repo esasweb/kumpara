@@ -84,6 +84,8 @@ if (Platform.isAndroid) {
 
 
 
+
+
 Future<void> requestNotificationPermission(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   final String lastPromptKey = 'last_notification_prompt_date';
@@ -339,6 +341,8 @@ class WebViewPage extends StatefulWidget {
   State<WebViewPage> createState() => _WebViewPageState();
 }
 
+
+
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver{
   static const String _initialUrl = 'https://www.kumpara.com.tr/mobil/';
   late final WebViewController _controller;
@@ -394,6 +398,18 @@ void _preloadAllBanners() {
       )..load();
     });
   }
+  
+  
+  Future<void> _prepareBannerHeight() async {
+  final int width = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize.width
+      ~/ WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+
+  final adSize = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+
+  if (adSize != null) {
+    _banner5Height = adSize.height.toDouble();
+  }
+}
 
 void _retryConnection() {
   setState(() {
@@ -453,6 +469,27 @@ Future<void> _loadBanner5FullWidth() async {
   if (adSize == null) return;
 
   _banner5Height = adSize.height.toDouble();
+  
+  _controller.runJavaScript("""
+  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px', 'important');
+
+  var banner = document.getElementById('bannerreklam5');
+  if (banner) {
+    banner.style.height = '${_banner5Height}px';
+    banner.style.minHeight = '${_banner5Height}px';
+  }
+
+  var main = document.querySelector('main.flex-grow-1');
+  if (main) {
+    main.classList.add('has-banner');
+    main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
+  }
+
+  var dbg = document.getElementById('debugBannerHeight');
+  if (dbg) {
+    dbg.innerText = 'Adaptive ready: ${_banner5Height}px';
+  }
+""");
 
   _banner5Ad = BannerAd(
     adUnitId: Platform.isAndroid
@@ -479,12 +516,33 @@ Future<void> _loadBanner5FullWidth() async {
               main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
             }
           """);
-        }
+        } 
       },
       onAdFailedToLoad: (ad, error) {
-        ad.dispose();
-        debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
-      },
+  ad.dispose();
+  debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
+
+  if (mounted) {
+    setState(() => _banner5Loaded = false);
+  }
+
+  _controller.runJavaScript("""
+    document.documentElement.style.setProperty('--app-banner-height', '0px', 'important');
+
+    var banner = document.getElementById('bannerreklam5');
+    if (banner) {
+      banner.style.display = 'none';
+      banner.style.height = '0px';
+      banner.style.minHeight = '0px';
+    }
+
+    var main = document.querySelector('main.flex-grow-1');
+    if (main) {
+      main.classList.remove('has-banner');
+      main.style.paddingTop = '72px';
+    }
+  """);
+},
     ),
   )..load();
 }
@@ -865,9 +923,13 @@ _loadRewardedAd();
 
 _controller = _createController();
 
-WidgetsBinding.instance.addPostFrameCallback((_) {
-  _loadBanner5FullWidth();
+
+WidgetsBinding.instance.addPostFrameCallback((_) async {
+  await _prepareBannerHeight();
+  await _loadBanner5FullWidth();
 });
+
+
   
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
@@ -1025,8 +1087,25 @@ onPageStarted: (String url) {
     _adPositions.clear();
   });
   
-  _controller.runJavaScript("""
-  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px');
+_controller.runJavaScript("""
+  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px', 'important');
+
+  var banner = document.getElementById('bannerreklam5');
+  if (banner) {
+    banner.style.height = '${_banner5Height}px';
+    banner.style.minHeight = '${_banner5Height}px';
+  }
+
+  var main = document.querySelector('main.flex-grow-1');
+  if (main) {
+    main.classList.add('has-banner');
+    main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
+  } 
+
+  var dbg = document.getElementById('debugBannerHeight');
+  if (dbg) {
+    dbg.innerText = 'onPageFinished: ${_banner5Height}px';
+  }
 """);
 
 _controller.runJavaScript('''
