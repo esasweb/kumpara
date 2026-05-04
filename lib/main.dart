@@ -16,7 +16,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:upgrader/upgrader.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -851,7 +851,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
       _controller.platform as AndroidWebViewController; 
-	  androidController.setOverScrollMode(AndroidOverScrollMode.never);
+	  androidController.setOverScrollMode(AndroidWebViewOverScrollMode.never);
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
   
@@ -1102,7 +1102,7 @@ _maybeShowAd();
 onWebResourceError: (error) {
   debugPrint("WebView error: ${error.description}");
 
-  if (error.isForMainFrame) {
+  if (error.isForMainFrame == true) {
     setState(() {
       _isLoading = false;
       _hasConnectionError = true;
