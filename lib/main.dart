@@ -863,12 +863,11 @@ _loadAdSettings().then((_) {
     });
 _loadRewardedAd();
 
+_controller = _createController();
+
 WidgetsBinding.instance.addPostFrameCallback((_) {
   _loadBanner5FullWidth();
 });
-
-  _controller = _createController();
-   
   
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
@@ -1025,9 +1024,14 @@ onPageStarted: (String url) {
     _showAd.clear();
     _adPositions.clear();
   });
+  
+  _controller.runJavaScript("""
+  document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px');
+""");
+
 _controller.runJavaScript('''
     var lastSentPositions = {};
-
+ 
     function trackBanners() {
        // onPageFinished içindeki ids listesini şu şekilde güncelle:
 const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4', 'bannerreklam5'];
