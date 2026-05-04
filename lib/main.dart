@@ -851,7 +851,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
       _controller.platform as AndroidWebViewController; 
-	  androidController.setOverScrollMode(AndroidWebViewOverScrollMode.never);
+	 
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
   
@@ -1036,21 +1036,7 @@ const ids = ['bannerreklam1', 'bannerreklam2', 'bannerreklam3', 'bannerreklam4',
         });
     }
 
-    // Olayları dinle
-    window.addEventListener('scroll', trackBanners);
-    window.addEventListener('resize', trackBanners);
-    
-    // Sayfa içindeki her türlü yer değişimini (resim yüklenmesi vb.) izler
-    if (window.ResizeObserver) {
-        const observer = new ResizeObserver(trackBanners);
-        document.body.childNodes.forEach(node => {
-            if(node.nodeType === 1) observer.observe(node);
-        });
-    }
-
-    // Periyodik kontrolü hızlandır (Görünürlük ve ani değişimler için)
-    setInterval(trackBanners, 100); 
-    trackBanners();
+   setTimeout(trackBanners, 300);
 ''');
 
 
