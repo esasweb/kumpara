@@ -350,7 +350,7 @@ RewardedAd? _rewardedAd;
 
 int _pageCount = 0;
 int _adsShown = 0;
-
+double _banner5Height = 50;
 bool _adsEnabled = false;
 int _interstitialEvery = 10;
 int _maxAdsPerSession = 3;
@@ -444,19 +444,41 @@ String get appOpenAdUnitId {
 }
 
 
-void _loadBanner5FullWidth() {
+Future<void> _loadBanner5FullWidth() async {
   final int width = MediaQuery.of(context).size.width.truncate();
+
+  final AnchoredAdaptiveBannerAdSize? adSize =
+      await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+
+  if (adSize == null) return;
+
+  _banner5Height = adSize.height.toDouble();
 
   _banner5Ad = BannerAd(
     adUnitId: Platform.isAndroid
         ? 'ca-app-pub-6275851890605245/6372884572'
         : 'ca-app-pub-6275851890605245/9377275683',
-  size: AdSize.fullBanner,
+    size: adSize,
     request: const AdRequest(),
     listener: BannerAdListener(
       onAdLoaded: (ad) {
         if (mounted) {
           setState(() => _banner5Loaded = true);
+
+          _controller.runJavaScript("""
+            document.documentElement.style.setProperty('--app-banner-height', '${_banner5Height}px');
+
+            var banner = document.getElementById('bannerreklam5');
+            if (banner) {
+              banner.style.height = '${_banner5Height}px';
+              banner.style.minHeight = '${_banner5Height}px';
+            }
+
+            var main = document.querySelector('main.flex-grow-1');
+            if (main) {
+              main.style.paddingTop = 'calc(72px + ${_banner5Height}px)';
+            }
+          """);
         }
       },
       onAdFailedToLoad: (ad, error) {
@@ -999,7 +1021,10 @@ onPageStarted: (String url) {
 
   onPageFinished: (String url) {
   
-
+ setState(() {
+    _showAd.clear();
+    _adPositions.clear();
+  });
 _controller.runJavaScript('''
     var lastSentPositions = {};
 
@@ -1067,21 +1092,26 @@ _maybeShowAd();
   _maybeShowReviewDialog();
 
 // --- YATAY KAYDIRMAYI ENGELLEME VE GİZLEME KODU ---
-  _controller.runJavaScript('''
-    var style = document.createElement('style');
-    style.type = 'text/css';
-    style.innerHTML = `
-      html, body {
-        overflow-x: hidden !important; /* Yatay kaydırmayı tamamen kapat */
-        width: 100% !important;
-        position: relative !important;
-      }
-      ::-webkit-scrollbar {
-        display: none !important; /* Kaydırma çubuklarını tamamen gizle (isteğe bağlı) */
-      }
-    `;
-    document.getElementsByTagName('head')[0].appendChild(style);
-  ''');
+_controller.runJavaScript('''
+  var style = document.createElement('style');
+  style.type = 'text/css';
+  style.innerHTML = `
+    html, body {
+      overflow-x: hidden !important;
+      width: 100% !important;
+      position: relative !important;
+
+      /* 🔥 BURAYI EKLE */
+      overscroll-behavior: none !important;
+      overscroll-behavior-y: none !important;
+    }
+
+    ::-webkit-scrollbar {
+      display: none !important;
+    }
+  `;
+  document.getElementsByTagName('head')[0].appendChild(style);
+''');
   // ------------------------------------------------
   
 },
@@ -1244,13 +1274,20 @@ if (_banner5Loaded &&
     top: _adPositions['bannerreklam5']!.dy,
     left: 0,
     right: 0,
-    height: 50,
-   child: Container(
+   height: _banner5Height,
+child: Container(
   width: double.infinity,
-  height: 50,
+  height: _banner5Height,
   margin: EdgeInsets.zero,
   padding: EdgeInsets.zero,
+  alignment: Alignment.center,
+  clipBehavior: Clip.hardEdge,
+  decoration: const BoxDecoration(color: Colors.white),
+ child: SizedBox(
+  width: _banner5Ad!.size.width.toDouble(),
+  height: _banner5Ad!.size.height.toDouble(),
   child: AdWidget(ad: _banner5Ad!),
+),
 ),
   ),
   
@@ -1265,20 +1302,7 @@ if (_banner5Loaded &&
       _bannerAds[id] != null && 
       position != null) {
 
-    // bannerreklam5 için Full-Width kuralı
-    if (id == 'bannerreklam5') {
-      return Positioned(
-        top: position.dy,
-        left: 0,
-        right: 0,
-        height: 50,
-        child: Container( 
-          color: Colors.white,
-          alignment: Alignment.center,
-          child: AdWidget(ad: _bannerAds[id]!),
-        ),
-      );
-    }
+  
 
     // Diğer reklamlar için standart kurallar
     return Positioned(
@@ -1307,7 +1331,7 @@ if (_banner5Loaded &&
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(3),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -1371,7 +1395,7 @@ if (_banner5Loaded &&
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
