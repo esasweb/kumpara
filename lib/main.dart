@@ -299,6 +299,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Kumpara',
       debugShowCheckedModeBanner: false,
+	  scrollBehavior: const NoGlowScrollBehavior(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -318,6 +319,19 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class NoGlowScrollBehavior extends ScrollBehavior {
+  const NoGlowScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+}
+
 class WebViewPage extends StatefulWidget {
   const WebViewPage({super.key});
 
@@ -328,7 +342,8 @@ class WebViewPage extends StatefulWidget {
 class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver{
   static const String _initialUrl = 'https://www.kumpara.com.tr/mobil/';
   late final WebViewController _controller;
-  bool _isLoading = true;
+ bool _isLoading = true;
+bool _hasConnectionError = false;
 StreamSubscription<Uri>? _sub;
 InterstitialAd? _interstitialAd;
 RewardedAd? _rewardedAd;
@@ -356,8 +371,10 @@ final Map<String, AdSize> _adSizes = {
   'bannerreklam2': AdSize.banner,
   'bannerreklam3': AdSize.largeBanner,
   'bannerreklam4': AdSize.banner,
-  'bannerreklam5': AdSize.banner, // 50px yükseklik için standart banner
+ 
 };
+BannerAd? _banner5Ad;
+bool _banner5Loaded = false;
  
 void _preloadAllBanners() {
     _adSizes.forEach((id, size) {
@@ -378,6 +395,14 @@ void _preloadAllBanners() {
     });
   }
 
+void _retryConnection() {
+  setState(() {
+    _hasConnectionError = false;
+    _isLoading = true;
+  });
+
+  _controller.reload();
+}
 DateTime _lastAdTime = DateTime.now();
 
 String get adUnitId {
@@ -416,6 +441,30 @@ String get appOpenAdUnitId {
     return 'ca-app-pub-6275851890605245/8084529874'; // Görseldeki iOS ID
   }
   return '';
+}
+
+
+void _loadBanner5FullWidth() {
+  final int width = MediaQuery.of(context).size.width.truncate();
+
+  _banner5Ad = BannerAd(
+    adUnitId: Platform.isAndroid
+        ? 'ca-app-pub-6275851890605245/6372884572'
+        : 'ca-app-pub-6275851890605245/9377275683',
+  size: AdSize.fullBanner,
+    request: const AdRequest(),
+    listener: BannerAdListener(
+      onAdLoaded: (ad) {
+        if (mounted) {
+          setState(() => _banner5Loaded = true);
+        }
+      },
+      onAdFailedToLoad: (ad, error) {
+        ad.dispose();
+        debugPrint("bannerreklam5 yüklenemedi: ${error.message}");
+      },
+    ),
+  )..load();
 }
 
 // Reklamı yükle (Pre-load)
@@ -792,12 +841,17 @@ _loadAdSettings().then((_) {
     });
 _loadRewardedAd();
 
+WidgetsBinding.instance.addPostFrameCallback((_) {
+  _loadBanner5FullWidth();
+});
+
   _controller = _createController();
    
   
 if (_controller.platform is AndroidWebViewController) {
   AndroidWebViewController androidController =
       _controller.platform as AndroidWebViewController; 
+	  androidController.setOverScrollMode(AndroidOverScrollMode.never);
 
   androidController.setMediaPlaybackRequiresUserGesture(false);
   
@@ -936,9 +990,10 @@ onNavigationRequest: (NavigationRequest request) async {
 onPageStarted: (String url) {
   setState(() {
     _isLoading = true;
+	_hasConnectionError = false;
     // Sayfa değiştiği an tüm bannerları ve pozisyonları temizle
-    _showAd.clear(); 
-    _adPositions.clear();
+    //_showAd.clear(); 
+    //_adPositions.clear();
   });
 },
 
@@ -1046,6 +1101,13 @@ _maybeShowAd();
 },
 onWebResourceError: (error) {
   debugPrint("WebView error: ${error.description}");
+
+  if (error.isForMainFrame) {
+    setState(() {
+      _isLoading = false;
+      _hasConnectionError = true;
+    });
+  }
 },
 ),
     ) 
@@ -1107,7 +1169,9 @@ await _syncOneSignalIdToBackendIfReady();
     _appOpenAd?.dispose();
     // Bannerları temizle
     _bannerAds.values.forEach((ad) => ad?.dispose());
+	_banner5Ad?.dispose();
     super.dispose();
+	
   }
  
  
@@ -1177,8 +1241,33 @@ Widget build(BuildContext context) {
         body: Stack(
           children: [
             // 1. KATMAN: WebView
-            WebViewWidget(controller: _controller),
+           // 1. KATMAN: WebView
+NotificationListener<OverscrollIndicatorNotification>(
+  onNotification: (overscroll) {
+    overscroll.disallowIndicator();
+    return true;
+  },
+  child: WebViewWidget(controller: _controller),
+),
 
+if (_banner5Loaded &&
+    _banner5Ad != null &&
+    _showAd['bannerreklam5'] == true &&
+    _adPositions['bannerreklam5'] != null)
+  Positioned(
+    top: _adPositions['bannerreklam5']!.dy,
+    left: 0,
+    right: 0,
+    height: 50,
+   child: Container(
+  width: double.infinity,
+  height: 50,
+  margin: EdgeInsets.zero,
+  padding: EdgeInsets.zero,
+  child: AdWidget(ad: _banner5Ad!),
+),
+  ),
+  
             // 2. KATMAN: Akıllı Takipçi Reklam
             // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
         // build metodu içindeki Stack katmanı:
@@ -1221,9 +1310,94 @@ Widget build(BuildContext context) {
 }).toList(),
 
             // 3. KATMAN: Loading
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator()),
+			if (_hasConnectionError)
+  Container(
+    color: const Color(0xFFF8F7FF),
+    width: double.infinity,
+    height: double.infinity,
+    padding: const EdgeInsets.all(24),
+    child: Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
           ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 74,
+              height: 74,
+              decoration: BoxDecoration(
+                color: const Color(0xFF635BEA).withOpacity(0.10),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: Color(0xFF635BEA),
+                size: 38,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "İnternet Bağlantısı Yok",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF2D3142),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "Bağlantınız zayıf veya yok. Lütfen internetinizi kontrol edip tekrar deneyin.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Color(0xFF919191),
+              ),
+            ),
+            const SizedBox(height: 26),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _retryConnection,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text(
+                  "YENİLE",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: .6,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF635BEA),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ),
+            if (_isLoading && !_hasConnectionError)
+  const Center(child: CircularProgressIndicator()),
+          ], 
         ),
       ),
     ),
