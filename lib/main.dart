@@ -357,6 +357,7 @@ int _maxAdsPerSession = 3;
 int _minSecondsBetweenAds = 90;
 bool _appOpenEnabled = false;
 int _appOpenCooldown = 30;
+bool _bannerAdsEnabled = true;
 
 // Eski banner değişkenlerini sil, bunları ekle:
 final Map<String, BannerAd?> _bannerAds = {};
@@ -376,23 +377,29 @@ final Map<String, AdSize> _adSizes = {
 
  
 void _preloadAllBanners() {
-    _adSizes.forEach((id, size) {
-      _bannerAds[id] = BannerAd(
-        adUnitId: Platform.isAndroid 
-            ? 'ca-app-pub-6275851890605245/6372884572' 
-            : 'ca-app-pub-6275851890605245/9377275683',
-        size: size,
-        request: const AdRequest(),
-        listener: BannerAdListener(
-          onAdLoaded: (ad) => setState(() => _isAdLoaded[id] = true),
-          onAdFailedToLoad: (ad, error) {
-            ad.dispose();
-            debugPrint("$id yüklenemedi: ${error.message}");
-          },
-        ),
-      )..load();
-    });
-  }
+  if (!_bannerAdsEnabled) return;
+
+  _adSizes.forEach((id, size) {
+    _bannerAds[id] = BannerAd(
+      adUnitId: Platform.isAndroid
+          ? 'ca-app-pub-6275851890605245/6372884572'
+          : 'ca-app-pub-6275851890605245/9377275683',
+      size: size,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (mounted) {
+            setState(() => _isAdLoaded[id] = true);
+          }
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint("$id yüklenemedi: ${error.message}");
+        },
+      ),
+    )..load();
+  });
+}
 
 void _retryConnection() {
   setState(() {
@@ -605,14 +612,16 @@ Future<void> _loadAdSettings() async {
 
     if (res.statusCode == 200) {
   final data = jsonDecode(res.body);
-  setState(() { // <--- BU ÇOK ÖNEMLİ
-    _adsEnabled = data["ads_enabled"] ?? false;
-    _interstitialEvery = data["interstitial_every"] ?? 10;
-    _maxAdsPerSession = data["max_ads_per_session"] ?? 3;
-    _minSecondsBetweenAds = data["min_seconds_between_ads"] ?? 90;
-    _appOpenEnabled = data["app_open_enabled"] ?? false;
-    _appOpenCooldown = data["app_open_cooldown_minutes"] ?? 30;
-  });
+setState(() {
+  _adsEnabled = data["ads_enabled"] ?? false;
+  _bannerAdsEnabled = data["banner_ads_enabled"] ?? true;
+
+  _interstitialEvery = data["interstitial_every"] ?? 10;
+  _maxAdsPerSession = data["max_ads_per_session"] ?? 3;
+  _minSecondsBetweenAds = data["min_seconds_between_ads"] ?? 90;
+  _appOpenEnabled = data["app_open_enabled"] ?? false;
+  _appOpenCooldown = data["app_open_cooldown_minutes"] ?? 30;
+});
 
   if (_appOpenEnabled) {
     _loadAppOpenAd();
@@ -814,7 +823,9 @@ void initState() {
   WidgetsBinding.instance.addObserver(this);
 _loadAdSettings().then((_) {
       _loadAd();
-      _preloadAllBanners(); // Bunu ekledik, 4 reklamı arkada yükler.
+    if (_bannerAdsEnabled) {
+  _preloadAllBanners();
+}
       _loadAppOpenAd();
     });
 _loadRewardedAd();
@@ -1221,7 +1232,8 @@ NotificationListener<OverscrollIndicatorNotification>(
             // 2. KATMAN: Akıllı Takipçi Reklam
             // Sitede div varsa, koordinatlar geldiyse ve reklam yüklüyse göster
         // build metodu içindeki Stack katmanı:
-..._adSizes.keys.map((id) {
+if (_bannerAdsEnabled)
+  ..._adSizes.keys.map((id) {
   final position = _adPositions[id];
   
   if (_showAd[id] == true &&  
